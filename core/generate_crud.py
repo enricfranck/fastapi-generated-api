@@ -2,8 +2,9 @@ import os
 import re
 from typing import List
 
-from model_type import ClassModel, AttributesModel, preserve_custom_sections, \
+from model_type import preserve_custom_sections, \
     snake_to_camel, camel_to_snake  # Import your model definitions
+from schemas import ClassModel
 
 OUTPUT_DIR = "/app/crud"
 
@@ -123,24 +124,3 @@ def write_crud(models: List[ClassModel], output_dir):
         with open(file_path, "w") as f:
             f.write(final_content)
         print(f"Generated CRUD for: {table_name}")
-
-
-if __name__ == "__main__":
-    # Define your models programmatically
-    user_attributes = [
-        AttributesModel(name="id", type="Integer", is_primary=True, is_auto_increment=True),
-        AttributesModel(name="username", type="String", length=50, is_unique=True),
-        AttributesModel(name="email", type="String", length=100, is_unique=True),
-        AttributesModel(name="role_id", type="Integer", is_foreign=True, foreign_key_class="Role", foreign_key="id"),
-    ]
-    role_attributes = [
-        AttributesModel(name="id", type="Integer", is_primary=True, is_auto_increment=True),
-        AttributesModel(name="name", type="String", length=50, is_unique=True),
-    ]
-
-    models = [
-        ClassModel(name="User", attributes=user_attributes),
-        ClassModel(name="Role", attributes=role_attributes),
-    ]
-
-    write_crud(models)

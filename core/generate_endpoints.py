@@ -1,9 +1,10 @@
 import os
 from typing import List
 
+from schemas import ClassModel
 from sqlalchemy.orm import DeclarativeMeta
 
-from model_type import ClassModel, snake_to_camel, camel_to_snake
+from model_type import  snake_to_camel, camel_to_snake
 
 OUTPUT_DIR = "/app/api/api_v1/endpoints"
 

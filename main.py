@@ -6,14 +6,22 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware  # Import CORSMiddleware
 
-from generate_base_file import write_base_files
-from generate_crud import write_crud
-from generate_endpoints import write_endpoints
-from generate_env import generate_env
-from generate_init_file import write_init_files
-from generate_models import write_models
-from generate_schema import write_schemas
-from model_type import ClassModel
+from core.generate_base_file import write_base_files
+from core.generate_crud import write_crud
+from core.generate_endpoints import write_endpoints
+from core.generate_env import generate_env
+from core.generate_init_file import write_init_files
+from core.generate_models import write_models
+from core.generate_schema import write_schemas
+from schemas import ClassModel, ProjectUpdate
+from sqlalchemy.orm import Session
+from fastapi import FastAPI, Depends
+
+import models, schemas, crud
+from core.database import engine, get_db, Base
+
+# Create DB tables
+# Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 app.add_middleware(
@@ -25,11 +33,6 @@ app.add_middleware(
 )
 
 
-class Project(BaseModel):
-    name: str
-    class_model: List[ClassModel]
-
-
 def set_full_permissions(directory: str):
     """Set full permissions (rwx) for all users (owner, group, others)."""
     try:
@@ -39,43 +42,37 @@ def set_full_permissions(directory: str):
         print(f"Failed to set permissions for directory {directory}: {e}")
 
 
+@app.post("/project/config", response_model=schemas.ProjectResponse)
+def create_project(project: schemas.ProjectCreate, db: Session = Depends(get_db)):
+    return crud.create_project(db=db, project=project)
+
+
+@app.put("/project/config", response_model=schemas.ProjectResponse)
+def update_project(project_id: int, project: schemas.ProjectCreate, db: Session = Depends(get_db)):
+    project = crud.update_config(db=db, project_data=project, project_id=project_id)
+
+    destination_dir = os.path.join(project.path, project.name)
+    generate_env(project.config, output_file=destination_dir + "/.env")
+    return project
+
+
+@app.get("/project/", response_model=list[schemas.ProjectResponse])
+def read_project(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
+    return crud.get_project(db, skip, limit)
+
+
 @app.post("/project")
 async def create_project(
-        path: str,
-        body: Project
+        project_id: int,
+        body: ProjectUpdate,
+        db: Session = Depends(get_db),
 ):
+    project = crud.get_project_by_id(db=db, id=project_id)
+    if not project:
+        return
+    path = project.path
     template_dir = os.path.join(os.path.dirname(__file__), "fastapi_template")
     destination_dir = os.path.join(path, body.name)
-
-    config = {
-        "DOMAIN": "localhost",
-        "STACK_NAME": f"{body.name.lower()}-com",
-        "SERVER_NAME": f"http://{body.name.lower()}-com",
-        "SERVER_HOST": f"http://{body.name.lower()}-com",
-        "DOCKER_IMAGE_BACKEND": "backend",
-        "BACKEND_CORS_ORIGINS": '["http://localhost","http://localhost:8070", "http://localhost:4200","http://localhost:8080", "https://localhost:3000", "http://192.168.88.60:4200", "http://127.0.0.1:8080"]',
-        "PROJECT_NAME": f"{body.name.title()}",
-        "SECRET_KEY": "tzrctxhgdc876guyguv6v",
-        "FIRST_SUPERUSER": f"admin@{body.name.lower()}.com",
-        "FIRST_NAME_SUPERUSER": "",
-        "LAST_NAME_SUPERUSER": "",
-        "FIRST_SUPERUSER_PASSWORD": "aze135azq35sfsnf6353sfh3xb68yyp31gf68k5sf6h3s5d68jd5",
-        "SMTP_TLS": "True",
-        "SMTP_PORT": "",
-        "SMTP_HOST": "",
-        "SMTP_USER": "",
-        "SMTP_PASSWORD": "",
-        "SMTP_SERVER": "smtp.gmail.com",
-        "EMAILS_FROM_EMAIL": "",
-        "MYSQL_HOST": "localhost",
-        "MYSQL_PORT": "",
-        "MYSQL_USER": "",
-        "MYSQL_ROOT_USER": "",
-        "MYSQL_ROOT_PASSWORD": "",
-        "MYSQL_PASSWORD": "",
-        "MYSQL_DATABASE": "test",
-        "MYSQL_ROOT_HOST": "%",
-    }
 
     try:
         if os.path.exists(destination_dir):
@@ -92,7 +89,7 @@ async def create_project(
 
             if not os.path.exists(destination_dir + "/.env"):
                 # Generate the .env file
-                generate_env(config, output_file=destination_dir + "/.env")
+                generate_env(project.config, output_file=destination_dir + "/.env")
 
             return destination_dir
 
@@ -111,11 +108,11 @@ async def create_project(
         write_base_files(body.class_model, destination_dir)
 
         # Generate the .env file
-        generate_env(config, output_file=destination_dir + "/.env")
+        generate_env(project.config, output_file=destination_dir + "/.env")
 
     except FileExistsError:
         print("Error: Directory already exists.")
     except Exception as e:
         print(f"An error occurred: {e}")
-
-    return destination_dir
+    data = crud.update_project(db=db, project_data=body, project_id=project_id)
+    return data

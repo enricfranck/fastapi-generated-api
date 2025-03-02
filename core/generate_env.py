@@ -8,5 +8,5 @@ def generate_env(config: dict, output_file: str = ".env"):
     """
     with open(output_file, "w") as f:
         for key, value in config.items():
-            f.write(f"{key}={value}\n")
+            f.write(f'{key.upper()}="{value}"\n')
     print(f"Generated .env file at: {output_file}")

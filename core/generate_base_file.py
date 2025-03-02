@@ -1,7 +1,8 @@
 import os
 from typing import List
 
-from model_type import snake_to_camel, ClassModel, camel_to_snake
+from model_type import snake_to_camel,camel_to_snake
+from schemas import ClassModel
 
 
 def generate_base_file(models: List[ClassModel]):

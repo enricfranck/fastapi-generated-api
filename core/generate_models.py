@@ -2,7 +2,8 @@ import os
 import re
 from typing import List
 
-from model_type import ClassModel, AttributesModel, preserve_custom_sections, camel_to_snake
+from model_type import  preserve_custom_sections, camel_to_snake
+from schemas import ClassModel, AttributesModel
 
 OUTPUT_DIR = "/app/models"
 
@@ -106,20 +107,3 @@ def write_models(models: List[ClassModel], output_dir):
         print(f"Generated model for: {model_name}")
 
 
-if __name__ == "__main__":
-    # Example usage
-    user_attributes = [
-        AttributesModel(name="id", type="Integer", is_primary=True, is_auto_increment=True),
-        AttributesModel(name="username", type="String", length=50, is_unique=True),
-        AttributesModel(name="email", type="String", length=100, is_unique=True),
-        AttributesModel(name="role_id", type="Integer", is_foreign=True, foreign_key_class="Role", foreign_key="id")
-    ]
-    role_attributes = [
-        AttributesModel(name="id", type="Integer", is_primary=True, is_auto_increment=True),
-        AttributesModel(name="name", type="String", length=50, is_unique=True)
-    ]
-
-    models = [
-        ClassModel(name="User", attributes=user_attributes),
-        ClassModel(name="Role", attributes=role_attributes)
-    ]

@@ -1,11 +1,13 @@
 import os
 import re
 from typing import List, Optional
+
+from schemas import ClassModel
 from sqlalchemy.ext.declarative import DeclarativeMeta
 from sqlalchemy import inspect
 from pydantic import BaseModel
 
-from model_type import ClassModel, AttributesModel, preserve_custom_sections, \
+from model_type import  preserve_custom_sections, \
     camel_to_snake, snake_to_camel  # Import your model definitions
 
 OUTPUT_DIR = "/app/schemas"
@@ -193,24 +195,3 @@ def write_schemas(models: List[ClassModel], output_dir: str):
         with open(file_path, "w") as f:
             f.write(final_content)
         print(f"Generated schemas for: {table_name}")
-
-
-if __name__ == "__main__":
-    # Define your models programmatically
-    user_attributes = [
-        AttributesModel(name="id", type="Integer", is_primary=True, is_auto_increment=True),
-        AttributesModel(name="username", type="String", length=50, is_unique=True),
-        AttributesModel(name="email", type="String", length=100, is_unique=True),
-        AttributesModel(name="role_id", type="Integer", is_foreign=True, foreign_key_class="Role", foreign_key="id"),
-    ]
-    role_attributes = [
-        AttributesModel(name="id", type="Integer", is_primary=True, is_auto_increment=True),
-        AttributesModel(name="name", type="String", length=50, is_unique=True),
-    ]
-
-    models = [
-        ClassModel(name="User", attributes=user_attributes),
-        ClassModel(name="Role", attributes=role_attributes),
-    ]
-
-    write_schemas(models)

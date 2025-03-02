@@ -1,0 +1,5 @@
+fastapi==0.115.11
+uvicorn==0.29
+alembic==1.13.1
+sqlalchemy==2.0.30
+pymysql==1.1.0
