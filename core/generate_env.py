@@ -1,3 +1,9 @@
+def replace_cote(value: str):
+    if type(value) == type([]):
+        return str(value).replace("'", '"')
+    return value
+
+
 def generate_env(config: dict, output_file: str = ".env"):
     """
     Generate a .env file with the provided configuration values.
@@ -8,5 +14,5 @@ def generate_env(config: dict, output_file: str = ".env"):
     """
     with open(output_file, "w") as f:
         for key, value in config.items():
-            f.write(f'{key.upper()}="{value}"\n')
+            f.write(f"{key.upper()}='{replace_cote(value)}'\n")
     print(f"Generated .env file at: {output_file}")

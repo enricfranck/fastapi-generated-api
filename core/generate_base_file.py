@@ -13,9 +13,10 @@ def generate_base_file(models: List[ClassModel]):
         f"from app.db.base_class import Base # noqa"
     ]
     for model in models:
+        model = ClassModel(**model)
         module_name = camel_to_snake(model.name)
         lines.append(
-            f"from .{module_name} import {model.name} # noqa")
+            f"from app.models.{module_name} import {model.name} # noqa")
 
     # Join all import statements with a newline and add a final newline
     return "\n".join(lines) + "\n"

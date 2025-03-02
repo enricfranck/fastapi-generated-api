@@ -119,6 +119,7 @@ def write_endpoints(models: List[ClassModel], output_dir):
     endpoints_directory = output_dir + OUTPUT_DIR
     os.makedirs(endpoints_directory, exist_ok=True)
     for model in models:
+        model = ClassModel(**model)
         table_name = camel_to_snake(model.name)
         endpoints = generate_router_file(table_name)
         file_name = f"{table_name}s.py"

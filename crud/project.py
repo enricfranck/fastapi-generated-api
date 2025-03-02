@@ -1,6 +1,8 @@
-from sqlalchemy.orm import Session
 from fastapi.encoders import jsonable_encoder
-import models, schemas
+from sqlalchemy.orm import Session
+
+import models
+import schemas
 
 
 def create_project(db: Session, project: schemas.ProjectCreate):

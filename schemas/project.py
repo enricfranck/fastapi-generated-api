@@ -54,7 +54,7 @@ class ConfigSchema(BaseModel):
     smtp_server: str = "smtp.gmail.com"
     emails_from_email: str = ""
     mysql_host: str = "localhost"
-    mysql_port: str = 3306
+    mysql_port: Any = 3306
     mysql_user: str
     mysql_password: str
     mysql_database: str
@@ -96,7 +96,7 @@ class ConfigSchema(BaseModel):
             smtp_user=get_or_default("smtp_user", "string"),
             smtp_password=get_or_default("smtp_password", "string"),
             smtp_server=get_or_default("smtp_server", "smtp.gmail.com"),
-            emails_from_email=get_or_default("emails_from_email", "string"),
+            emails_from_email=get_or_default("emails_from_email", "test@gmail.com"),
             mysql_host=get_or_default("mysql_host", "localhost"),
             mysql_port=get_or_default("mysql_port", 3306),
             mysql_user=get_or_default("mysql_user", ""),

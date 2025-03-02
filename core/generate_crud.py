@@ -112,6 +112,7 @@ def write_crud(models: List[ClassModel], output_dir):
     output_dir += OUTPUT_DIR
     os.makedirs(output_dir, exist_ok=True)
     for model in models:
+        model = ClassModel(**model)
         table_name = camel_to_snake(model.name)
         model_name = model.name
         crud_content = generate_crud(table_name, model_name)

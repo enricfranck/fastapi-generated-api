@@ -184,6 +184,7 @@ def write_schemas(models: List[ClassModel], output_dir: str):
     output_dir += OUTPUT_DIR
     os.makedirs(output_dir, exist_ok=True)
     for model in models:
+        model = ClassModel(**model)
         table_name = camel_to_snake(model.name)
         schemas = generate_full_schema(model, table_name)
         file_name = f"{table_name}.py"

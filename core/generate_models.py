@@ -94,6 +94,7 @@ def write_models(models: List[ClassModel], output_dir):
     """Write the generated models to files, preserving custom sections."""
     os.makedirs(output_dir, exist_ok=True)
     for model in models:
+        model = ClassModel(**model)
         model_name = camel_to_snake(model.name)
         models_content = generate_full_models(model)
         file_name = f"{model_name}.py"
