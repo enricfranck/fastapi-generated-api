@@ -1,0 +1,14 @@
+version: "3.8"
+services:
+  api:
+    image: "${IMAGE_NAME}"
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${HOST_PORT}:${CONTAINER_PORT}"
+    volumes:
+      - .:/app
+      - ./files:/app/files
+      - /app/venv
+    command: /bin/sh -c "prestart.sh"
