@@ -2,7 +2,7 @@ import os
 import re
 from typing import List
 
-from model_type import  preserve_custom_sections, camel_to_snake
+from model_type import preserve_custom_sections, camel_to_snake, snake_to_camel, generate_class_name
 from schemas import ClassModel, AttributesModel
 
 OUTPUT_DIR = "/app/models"
@@ -22,7 +22,8 @@ def generate_import(model: ClassModel):
 def generate_models(model: ClassModel):
     """Generate the SQLAlchemy model class."""
     table_name = camel_to_snake(model.name)
-    models_lines = [f"\n\nclass {model.name}(Base):", f"    __tablename__ = '{table_name}'"]
+    model_name = generate_class_name(model.name)
+    models_lines = [f"\n\nclass {model_name}(Base):", f"    __tablename__ = '{table_name}'"]
 
     # Add default columns: created_at, updated_at, deleted_at
     default_columns = [

@@ -14,6 +14,14 @@ def create_project(db: Session, project: schemas.ProjectCreate):
     return db_project
 
 
+def delete_project(db: Session, project_id: int):
+    # Fetch the project from the database
+    db_project = db.query(models.Project).filter(models.Project.id == project_id).first()
+    # Delete the project
+    db.delete(db_project)
+    db.commit()
+
+
 def update_project(db: Session, project_id: int, project_data: schemas.ProjectUpdate):
     db_project = db.query(models.Project).filter(models.Project.id == project_id).first()
     if db_project:

@@ -1,6 +1,6 @@
 import os
 
-from model_type import snake_to_camel
+from model_type import snake_to_camel, generate_class_name
 
 
 def generate_init_file(folder, folder_type: str = "schemas"):
@@ -9,7 +9,7 @@ def generate_init_file(folder, folder_type: str = "schemas"):
     for file_name in os.listdir(folder):
         if file_name.endswith(".py") and file_name != "__init__.py" and file_name != "base.py":
             module_name = file_name.replace(".py", "")
-            class_name = snake_to_camel(module_name)
+            class_name = generate_class_name(module_name)
             if folder_type == "schemas":
                 if module_name == 'msg':
                     lines.append(

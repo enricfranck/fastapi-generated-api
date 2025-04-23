@@ -26,6 +26,7 @@ def generate_crud_imports(table_name: str, model_name: str) -> str:
 
     import_user = [
         "from app.core.security import get_password_hash, verify_password",
+        "from fastapi.encoders import jsonable_encoder",
     ]
     if model_name == "User":
         imports += import_user
@@ -71,6 +72,9 @@ def generate_crud_functions(table_name: str, model_name: str) -> str:
         f"    def is_superuser(self, user: User) -> {model_name}:",
         f"        return user.is_superuser",
         "",
+        f"    def is_active(self, user: User) -> {model_name}:",
+        f"        return user.is_active",
+        "",
         f"    def authenticate(self, db: Session, *, email: str, password: str) -> {model_name}:",
         f"        user = self.get_by_email(db, email=email)",
         f"        if not user:",
@@ -79,6 +83,16 @@ def generate_crud_functions(table_name: str, model_name: str) -> str:
         f"            return None",
         f"        return user",
         "",
+        f"    def create(self, db: Session, *, obj_in: UserCreate) -> User:",
+        f"        obj_data = jsonable_encoder(obj_in)",
+        f"        pass_value = obj_data.pop('password')",
+        f"        db_obj = User(hashed_password=get_password_hash(pass_value), **obj_data)",
+        f"        db.add(db_obj)",
+        f"        db.commit()",
+        f"        db.refresh(db_obj)",
+        f"        return db_obj",
+        f"",
+        f"",
     ]
 
     if model_name == "User":

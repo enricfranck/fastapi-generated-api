@@ -7,34 +7,11 @@ from sqlalchemy.ext.declarative import DeclarativeMeta
 from sqlalchemy import inspect
 from pydantic import BaseModel
 
-from model_type import  preserve_custom_sections, \
+from model_type import preserve_custom_sections, \
     camel_to_snake, snake_to_camel  # Import your model definitions
+from utils.generate_data_test import get_column_type, generate_comumn_name
 
 OUTPUT_DIR = "/app/schemas"
-
-
-def get_column_type(column_type: str) -> str:
-    """Map SQLAlchemy column type strings to Pydantic types."""
-    column_type = column_type.lower()  # Normalize the type string
-
-    if column_type == "integer":
-        return "int"
-    elif column_type == "string" or column_type == "text":
-        return "str"
-    elif column_type == "boolean":
-        return "bool"
-    elif column_type == "float":
-        return "float"
-    elif column_type == "datetime":
-        return "datetime"
-    elif column_type == "date":
-        return "date"
-    elif column_type == "uuid":
-        return "UUID"
-    elif column_type == "json":
-        return "dict"
-    else:
-        return "Any"
 
 
 def generate_import(model: ClassModel) -> str:
@@ -59,10 +36,12 @@ def generate_base_schema(model: ClassModel, table_name: str) -> str:
     schema_name = f"{snake_to_camel(table_name)}Base"
     schema_lines = [f"\nclass {schema_name}(BaseModel):"]
     for column in model.attributes:
-        column_type = get_column_type(column.type)
-        is_optional = not column.is_required
-        default_value = " = None" if is_optional else ""
-        schema_lines.append(f"    {column.name}: Optional[{column_type}]{default_value}")
+        if column.name != 'id':
+            column_name = generate_comumn_name(column.name, not column.is_required)
+            column_type = get_column_type(column.type)
+
+            default_value = " = None" if column_name['optional'] else ""
+            schema_lines.append(f"    {column_name['name']}: Optional[{column_type}]{default_value}")
     schema_lines.append("")
     return "\n".join(schema_lines)
 
@@ -75,8 +54,9 @@ def generate_create_schema(model: ClassModel, base_schema: str, table_name: str)
     # Add required fields (nullable=False and no default value)
     for column in model.attributes:
         if column.is_required and not column.is_primary:
+            column_name = generate_comumn_name(column.name)
             column_type = get_column_type(column.type)
-            schema_lines.append(f"    {column.name}: {column_type}")
+            schema_lines.append(f"    {column_name['name']}: {column_type}")
     if len(schema_lines) == 1:
         schema_lines.append("    pass")
 

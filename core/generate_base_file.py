@@ -1,7 +1,7 @@
 import os
 from typing import List
 
-from model_type import snake_to_camel,camel_to_snake
+from model_type import snake_to_camel, camel_to_snake, generate_class_name
 from schemas import ClassModel
 
 
@@ -14,9 +14,10 @@ def generate_base_file(models: List[ClassModel]):
     ]
     for model in models:
         model = ClassModel(**model)
+        model_name = generate_class_name(model.name)
         module_name = camel_to_snake(model.name)
         lines.append(
-            f"from app.models.{module_name} import {model.name} # noqa")
+            f"from app.models.{module_name} import {model_name} # noqa")
 
     # Join all import statements with a newline and add a final newline
     return "\n".join(lines) + "\n"

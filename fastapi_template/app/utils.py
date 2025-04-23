@@ -1,5 +1,6 @@
 import logging
 import os
+import random
 import smtplib
 import uuid
 from datetime import datetime, timedelta
@@ -141,3 +142,8 @@ def verify_password_reset_token(token: str) -> Optional[str]:
         return decoded_token["email"]
     except jwt.JWTError:
         return None
+
+def pick_random_key_value(data: dict):
+    # Pick a random key-value pair
+    random_key, random_value = random.choice(list(data.items()))
+    return [random_key, random_value]

@@ -42,6 +42,17 @@ def snake_to_camel(snake_str):
     return ''.join(word.capitalize() for word in snake_str.split('_'))
 
 
+def generate_class_name(class_name: str) -> str:
+    """Convert a string to CamelCase."""
+    # Replace any non-alphanumeric characters with spaces
+    class_name = re.sub(r'[^a-zA-Z0-9]', ' ', class_name)
+    # Split into words based on spaces
+    words = class_name.split()
+    # Capitalize the first letter of each word and join them
+    camel_case = ''.join(word.capitalize() for word in words)
+    return camel_case
+
+
 def camel_to_snake(name):
     """Convert CamelCase to snake_case."""
     snake_case = ""
@@ -58,7 +69,7 @@ def create_or_update_mysql_user(new_user, new_password, database):
         # Connect to the MySQL server
         connection = pymysql.connect(
             host='localhost',
-            user='fastapi',
+            user='fastapi_generated',
             password="password",
             cursorclass=pymysql.cursors.DictCursor
         )
@@ -84,15 +95,63 @@ def create_or_update_mysql_user(new_user, new_password, database):
             create_user_query = f"CREATE USER '{new_user}'@'%' IDENTIFIED BY '{new_password}';"
             cursor.execute(create_user_query)
 
-            # Grant all privileges on the specified database to the new user
-            grant_query = f"GRANT ALL PRIVILEGES ON {database}.* TO '{new_user}'@'%' WITH GRANT OPTION;"
+            # Revoke all privileges
+            revoke_query = f"REVOKE ALL PRIVILEGES ON *.* FROM '{new_user}'@'%';"
+            cursor.execute(revoke_query)
+
+            # Grant all privileges
+            grant_query = f"GRANT ALL PRIVILEGES ON *.* TO '{new_user}'@'%' WITH GRANT OPTION;"
             cursor.execute(grant_query)
 
             # Flush privileges to apply changes
             flush_query = "FLUSH PRIVILEGES;"
             cursor.execute(flush_query)
 
+            # Flush privileges to apply changes
+            flush_query = "FLUSH PRIVILEGES;"
+            cursor.execute(flush_query)
+
             print(f"User '{new_user}' created/updated successfully with GRANT OPTION.")
+
+        # Commit the changes
+        connection.commit()
+
+    except Error as e:
+        print(f"Error: {e}")
+
+    finally:
+        if connection:
+            connection.close()
+            print("MySQL connection is closed.")
+
+
+def drop_mysql_database_user(new_user, database):
+    connection = None
+    try:
+        # Connect to the MySQL server
+        connection = pymysql.connect(
+            host='localhost',
+            user='fastapi_generated',
+            password="password",
+            cursorclass=pymysql.cursors.DictCursor
+        )
+
+        with connection.cursor() as cursor:
+            # Create the database if it does not exist
+            create_database_query = f"DROP DATABASE {database};"
+            cursor.execute(create_database_query)
+            print(f"Database '{database}' droped (if it did not exist).")
+
+            # Check if the user already exists
+            check_user_query = f"SELECT User FROM mysql.user WHERE User = '{new_user}';"
+            cursor.execute(check_user_query)
+            result = cursor.fetchone()
+
+            if result:
+                # If the user exists, drop the user
+                drop_user_query = f"DROP USER '{new_user}'@'%';"
+                cursor.execute(drop_user_query)
+                print(f"User '{new_user}' exists. Dropping the user.")
 
         # Commit the changes
         connection.commit()

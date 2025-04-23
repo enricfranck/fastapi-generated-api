@@ -1,8 +1,8 @@
 {
-    "new_project_path": "/Users/macbookpro/Desktop/projet/malagasy",
-    "db": "malagasy",
-    "user": "malagasy",
+    "new_project_path": "/Users/macbookpro/Desktop/projet/Investissement",
+    "db": "investi",
+    "user": "investi",
     "host": "localhost",
-    "password": "password",
-    "port": "3306"
+    "password": "Investi1234/",
+    "port": 3306
 }
