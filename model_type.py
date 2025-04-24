@@ -1,9 +1,11 @@
 import json
 import os
 import re
+from pathlib import Path
 
 import pymysql
 from pymysql import Error
+from core.config import settings
 
 from schemas import ClassModel
 from schemas.project import ProjectBase
@@ -68,9 +70,9 @@ def create_or_update_mysql_user(new_user, new_password, database):
     try:
         # Connect to the MySQL server
         connection = pymysql.connect(
-            host='localhost',
-            user='fastapi_generated',
-            password="password",
+            host=settings.MYSQL_HOST,
+            user=settings.MYSQL_USER,
+            password=settings.MYSQL_PASSWORD,
             cursorclass=pymysql.cursors.DictCursor
         )
 
@@ -130,9 +132,9 @@ def drop_mysql_database_user(new_user, database):
     try:
         # Connect to the MySQL server
         connection = pymysql.connect(
-            host='localhost',
-            user='fastapi_generated',
-            password="password",
+            host=settings.MYSQL_HOST,
+            user=settings.MYSQL_USER,
+            password=settings.MYSQL_PASSWORD,
             cursorclass=pymysql.cursors.DictCursor
         )
 
@@ -166,8 +168,11 @@ def drop_mysql_database_user(new_user, database):
 
 
 def write_config(config: ProjectBase):
+    current_dir = Path(__file__).resolve().parent
+    root_dir = current_dir.parent
+    remote_directory = os.path.normpath(os.path.join(os.path.normpath(root_dir), config.name))
     config = {
-        "new_project_path": config.path + "/" + config.name,
+        "new_project_path": remote_directory,
         "db": config.config['mysql_database'],
         "user": config.config['mysql_user'],
         "host": config.config['mysql_host'],

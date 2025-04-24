@@ -3,3 +3,7 @@ uvicorn==0.29
 alembic==1.13.1
 sqlalchemy==2.0.30
 pymysql==1.1.0
+pydantic[email]
+python-jose[cryptography]
+python-dotenv
+pydantic_settings

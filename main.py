@@ -25,6 +25,7 @@ from fastapi import FastAPI, Depends, HTTPException
 import models, schemas, crud
 from core.database import engine, get_db, Base
 from utils.alembic_command import run_migrations
+from pathlib import Path
 
 # Create DB tables
 Base.metadata.create_all(bind=engine)
@@ -49,10 +50,10 @@ def set_full_permissions(directory: str):
 
 
 def create_all_file(project, destination_dir, migration_message):
-    # If the directory already exists, set full permissions
+    print("Setting permissions...")
     set_full_permissions(destination_dir)
 
-    # Generate files in the existing directory
+    print("Generating project files...")
     write_models(project.class_model, destination_dir)
     write_schemas(project.class_model, destination_dir)
     write_crud(project.class_model, destination_dir)
@@ -61,17 +62,28 @@ def create_all_file(project, destination_dir, migration_message):
     write_base_files(project.class_model, destination_dir)
     write_test_crud(project.class_model, destination_dir)
     write_test_apis(project.class_model, destination_dir)
+    generate_env(project.config, output_file=os.path.normpath(os.path.join(destination_dir, ".env")))
 
-    generate_env(project.config, output_file=destination_dir + "/.env")
+    # Optionally force file system sync
+    try:
+        os.sync()
+    except AttributeError:
+        pass  # os.sync doesn't exist on some platforms
+
+    print("All files generated. Proceeding with Alembic migration...")
     run_migrations(message=migration_message)
 
 
 def generate_project(project, migration_message):
-    path = project.path
-    template_dir = os.path.join(os.path.dirname(__file__), "fastapi_template")
-    destination_dir = os.path.join(path, project.name)
+    # Get current file's directory (inside 'test')
+    current_dir = Path(__file__).resolve().parent
+    root_dir = current_dir.parent
+    template_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "fastapi_template"))
+    destination_dir = os.path.normpath(os.path.join(os.path.normpath(root_dir), project.name))
+
     write_config(project)
     try:
+        print("mandalo tsara", template_dir, destination_dir)
         if os.path.exists(destination_dir):
             create_all_file(project, destination_dir, migration_message)
         else:
@@ -194,4 +206,3 @@ if __name__ == "__main__":
         "reload": True,
     }
     uvicorn.run(**config)
-
