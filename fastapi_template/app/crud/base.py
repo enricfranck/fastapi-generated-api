@@ -2,12 +2,11 @@ from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
 
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
-from sqlalchemy import desc, asc, and_
-from sqlalchemy.orm import (
-    Session,
-)
+from sqlalchemy import asc, desc, and_
+from sqlalchemy.orm import Session
 
-from db.base_class import Base
+from app.db.base_class import Base
+
 
 ModelType = TypeVar("ModelType", bound=Base)
 CreateSchemaType = TypeVar("CreateSchemaType", bound=BaseModel)
@@ -19,100 +18,70 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         """
         CRUD object with default methods to Create, Read, Update, Delete (CRUD).
 
-        **Parameters**
-
-        * `model`: A SQLAlchemy model class
-        * `schema`: A Pydantic model (schema) class
+        Parameters:
+            model: A SQLAlchemy model class
         """
         self.model = model
 
-    def get(
-            self,
-            db: Session,
-            id: Any,
-    ) -> Optional[ModelType]:
-        query = db.query(self.model).filter(self.model.id == id)
-        return query.first()
-
-    from typing import List, Any, TypeVar
-    from sqlalchemy.orm import Session
-    from sqlalchemy import asc, desc, and_
-
-    ModelType = TypeVar('ModelType')
+    def get(self, db: Session, id: Any) -> Optional[ModelType]:
+        return db.query(self.model).filter(self.model.id == id).first()
 
     def get_multi(
-            self,
-            db: Session,
-            *,
-            skip: int = 0,
-            limit: int = 100,
-            order_by: str = "id",
-            order: str = "desc",
-            filter_: List[Any] = None
+        self,
+        db: Session,
+        *,
+        skip: int = 0,
+        limit: int = 100,
+        order_by: str = "id",
+        order: str = "desc",
+        filter_: Optional[List[Any]] = None
     ) -> List[ModelType]:
-        # Start with the base query
         query = db.query(self.model)
 
-        # Apply filters if any
-        if filter_ is not None and len(filter_) > 0:
+        if filter_:
             query = query.filter(and_(*filter_))
 
-        # Determine the sorting order
         order_func = asc if order.lower() == "asc" else desc
-
-        # Apply the sorting
         query = query.order_by(order_func(getattr(self.model, order_by)))
-
-        # Apply pagination
-        query = query.offset(skip).limit(limit)
-
-        # Execute the query and return the results
-        result = query.all()
-        return result
+        return query.offset(skip).limit(limit).all()
 
     def get_count(
-            self,
-            db: Session,
-            filter_: List[Any] = None
+        self,
+        db: Session,
+        filter_: Optional[List[Any]] = None
     ) -> int:
         query = db.query(self.model)
-
-        # Apply filters if any
-        if filter_ is not None and len(filter_) > 0:
+        if filter_:
             query = query.filter(and_(*filter_))
-
-        # Execute the query and return the count
-        result = query.count()
-        return result
+        return query.count()
 
     def create(
-            self,
-            db: Session,
-            *,
-            obj_in: CreateSchemaType,
+        self,
+        db: Session,
+        *,
+        obj_in: CreateSchemaType
     ) -> ModelType:
-        obj_in_data = jsonable_encoder(obj_in)
-        db_obj = self.model(**obj_in_data)  # type: ignore
+        obj_data = jsonable_encoder(obj_in)
+        db_obj = self.model(**obj_data)  # type: ignore
         db.add(db_obj)
         db.commit()
         db.refresh(db_obj)
         return db_obj
 
     def update(
-            self,
-            db: Session,
-            *,
-            db_obj: ModelType,
-            obj_in: Union[UpdateSchemaType, Dict[str, Any]],
+        self,
+        db: Session,
+        *,
+        db_obj: ModelType,
+        obj_in: Union[UpdateSchemaType, Dict[str, Any]]
     ) -> ModelType:
         obj_data = jsonable_encoder(db_obj)
-        if isinstance(obj_in, dict):
-            update_data = obj_in
-        else:
-            update_data = obj_in.dict(exclude_unset=True)
+        update_data = obj_in if isinstance(obj_in, dict) else obj_in.dict(exclude_unset=True)
+
         for field in obj_data:
             if field in update_data:
                 setattr(db_obj, field, update_data[field])
+
         db.add(db_obj)
         db.commit()
         db.refresh(db_obj)

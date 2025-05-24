@@ -7,7 +7,7 @@ import schemas
 
 def create_project(db: Session, project: schemas.ProjectCreate):
     config = jsonable_encoder(schemas.ConfigSchema.from_body(project, jsonable_encoder(project.config)))
-    db_project = models.Project(name=project.name, config=config, path=project.path)
+    db_project = models.Project(name=project.name, config=config, path="project")
     db.add(db_project)
     db.commit()
     db.refresh(db_project)
@@ -36,7 +36,6 @@ def update_config(db: Session, project_id: int, project_data: schemas.ProjectCre
 
     config = jsonable_encoder(schemas.ConfigSchema.from_body(project_data, jsonable_encoder(project_data.config)))
     if db_project:
-        db_project.path = jsonable_encoder(project_data.path)
         db_project.name = jsonable_encoder(project_data.name)
         db_project.config = jsonable_encoder(config)
         db.commit()

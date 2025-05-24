@@ -67,7 +67,7 @@ def create_all_file(project, destination_dir, migration_message):
 
 
 def generate_project(project, migration_message):
-    path = project.path
+    path = "project"
     template_dir = os.path.join(os.path.dirname(__file__), "fastapi_template")
     destination_dir = os.path.join(path, project.name)
     write_config(project)
@@ -80,8 +80,6 @@ def generate_project(project, migration_message):
 
             # Generate files in the new directory
             create_all_file(project, destination_dir, migration_message)
-
-
 
     except FileExistsError as e:
         print("Error: Directory already exists.", e)
@@ -110,7 +108,7 @@ def update_project(
 ):
     project = crud.update_config(db=db, project_data=project_in, project_id=project_id)
 
-    destination_dir = os.path.join(project.path, project.name)
+    destination_dir = os.path.join("project", project.name)
     create_or_update_mysql_user(
         project_in.config.mysql_user,
         project_in.config.mysql_password,
@@ -141,7 +139,7 @@ def read_project(project_id: int, db: Session = Depends(get_db)):
     project = crud.get_project_by_id(db, project_id)
     if not project:
         raise HTTPException(status_code=404, detail='Project not found')
-    folder_path = project.path + "/" + project.name
+    folder_path = "project" + "/" + project.name
     if os.path.exists(folder_path):
         # Remove the folder and its contents recursively
         shutil.rmtree(folder_path)
@@ -178,7 +176,7 @@ async def update_project(
     if write_project:
         generate_project(project, migration_message)
         if len(deleted_class) > 0:
-            destination_dir = os.path.join(project.path, project.name)
+            destination_dir = os.path.join("project", project.name)
             for class_name in deleted_class:
                 delete_files(class_name, destination_dir)
             write_init_files(destination_dir)

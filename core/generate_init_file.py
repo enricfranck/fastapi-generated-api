@@ -7,7 +7,7 @@ def generate_init_file(folder, folder_type: str = "schemas"):
     """Generate an __init__.py file to import schema classes from each file."""
     lines = []
     for file_name in os.listdir(folder):
-        if file_name.endswith(".py") and file_name != "__init__.py" and file_name != "base.py":
+        if file_name.endswith(".py") and file_name != "__init__.py" and file_name != "base.py" and file_name != "base_copy.py":
             module_name = file_name.replace(".py", "")
             class_name = generate_class_name(module_name)
             if folder_type == "schemas":

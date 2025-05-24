@@ -6,13 +6,65 @@ def replace_cote(value: str):
 
 def generate_env(config: dict, output_file: str = ".env"):
     """
-    Generate a .env file with the provided configuration values.
-
-    Args:
-        config (dict): A dictionary containing key-value pairs for the .env file.
-        output_file (str): The path to the output .env file (default: .env).
+    Generate a .env file with structured comments and the provided configuration values.
     """
+    content = f"""\
+# --- Project Metadata ---
+PROJECT_NAME='{replace_cote(config["project_name"])}'
+IMAGE_NAME='{replace_cote(config["docker_image_backend"])}'
+
+# --- Networking Configuration ---
+HOST_PORT='{replace_cote(config["host_port"])}'
+CONTAINER_PORT='{replace_cote(config["container_port"])}'
+
+# --- Server Settings ---
+SERVER_NAME='{replace_cote(config["server_name"])}'  # Or your domain name e.g., api.example.com
+SERVER_HOST='{replace_cote(config["server_host"])}'  # Listen on all available interfaces
+SCHEMAS='http'  # Use https in production with TLS
+
+# --- CORS Settings ---
+# Comma-separated list of frontend origins allowed to access the backend
+# Example for local development with React/Vue/Angular default ports
+BACKEND_CORS_ORIGINS={replace_cote(config["backend_cors_origins"])}
+
+# --- MySQL Database Configuration ---
+MYSQL_HOST='{replace_cote(config["mysql_host"])}'  # Or the Docker service name (e.g., db, host.docker.internal) or external host IP
+MYSQL_PORT={replace_cote(config["mysql_port"])}
+MYSQL_USER='{replace_cote(config["mysql_user"])}'
+MYSQL_PASSWORD='{replace_cote(config["mysql_password"])}'
+MYSQL_DATABASE='{replace_cote(config["mysql_database"])}'
+
+# --- SMTP Settings (Skipped as requested) ---
+SMTP_TLS={config["smtp_tls"]}
+SMTP_PORT={replace_cote(config["smtp_port"])}  # Use a common default port number (e.g., 587, 465, 25)
+SMTP_HOST={replace_cote(config["smtp_host"])}  # Use a placeholder hostname
+SMTP_USER={replace_cote(config["smtp_user"])}  # Use a placeholder email/username
+SMTP_PASSWORD={replace_cote(config["smtp_password"])}  # Use a placeholder password
+EMAILS_FROM_EMAIL={replace_cote(config["emails_from_email"])}  # Use a valid placeholder email format
+EMAILS_FROM_NAME='MyFastAPIProject'  # Use your project name or placeholder
+SMTP_SERVER={replace_cote(config["smtp_server"])}  # Often same as SMTP_HOST
+PASSWORD_FROM_EMAIL='password-reset@example.com'  # Use a valid placeholder email
+
+# --- Superuser Credentials ---
+FIRST_SUPERUSER='{replace_cote(config["first_superuser"])}'
+LAST_NAME_SUPERUSER='{replace_cote(config["last_name_superuser"])}'
+FIRST_NAME_SUPERUSER='{replace_cote(config["first_name_superuser"])}'
+FIRST_SUPERUSER_PASSWORD='{replace_cote(config["first_superuser_password"])}'  # Change this for production!
+
+# --- App Configuration ---
+API_V1_STR='/api/v1'
+SECRET_KEY='{replace_cote(config["secret_key"])}'  # Generate a strong key, e.g. openssl rand -hex 32
+ENVIRONMENT='development'
+
+# --- MongoDB Settings ---
+MONGO_DB_HOST='host.docker.internal'
+MONGO_DB_PORT=27017
+MONGO_DB_USER='root'
+MONGO_DB_PASSWORD='password'
+MONGO_DB_CLIENT='admin'
+MONGO_DB_COLLECTION='investissement'
+"""
     with open(output_file, "w") as f:
-        for key, value in config.items():
-            f.write(f"{key.upper()}='{replace_cote(value)}'\n")
-    print(f"Generated .env file at: {output_file}")
+        f.write(content)
+
+    print(f"Generated structured .env file at: {output_file}")

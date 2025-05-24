@@ -13,9 +13,7 @@ from sqlalchemy.orm import (
     joinedload,
     load_only,
 )
-from app.core.config import settings
 from app.db.base_class import Base
-from app.models import User
 
 ModelType = TypeVar("ModelType", bound=Base)
 CreateSchemaType = TypeVar("CreateSchemaType", bound=BaseModel)
@@ -40,7 +38,6 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             id: Any,
             where: Any = "",
             relations=None,
-            current_user=None,
             include_deleted=False,
     ) -> Optional[ModelType]:
         query = db.query(self.model).filter(self.model.id == id)
@@ -48,9 +45,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         if where is not None and where != "":
             where = ast.literal_eval(where)
             conditions = self.get_full_condition(
-                db=db,
                 where=where,
-                current_user=current_user,
                 include_deleted=include_deleted,
             )
             if conditions is not None:
@@ -87,13 +82,15 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                 else:
                     result = joinedload(attr)
 
-                if columns:
-                    result = result.load_only(*columns)
-                else:
-                    result = result.load_only("id")
+                # Use current model BEFORE updating previous_model
+                current_model = attr.property.mapper.class_
 
-                if i < len(parts) - 1:
-                    previous_model = attr.property.mapper.class_
+                if columns:
+                    result = result.load_only(*[getattr(current_model, col) for col in columns])
+                else:
+                    result = result.load_only(getattr(current_model, "id"))
+
+                previous_model = current_model
 
             return result
 
@@ -104,7 +101,6 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         return options
 
     def get_key_parts(self, key):
-        # print(key)
         subpart_start_idx = key.find(".[")
         last_index_of_parts1 = len(key)
         if subpart_start_idx >= 0:
@@ -120,8 +116,6 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
             for i in range(0, len(subpart_keys)):
                 subpart = self.get_key_parts(regex.sub(";", ",", subpart_keys[i]))
-                # if len(subpart) == 1:
-                #     subpart = subpart[0]
                 all_sub_parts.append(subpart)
 
             if len(all_sub_parts) > 0:
@@ -151,7 +145,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                             cond = ~cond
         return cond
 
-    def get_condition_deep_multiple(self, db, condition, current_user=None):
+    def get_condition_deep_multiple(self, condition):
         key = condition.get("key", None)
         value = condition.get("value", None)
         operator = condition.get("operator", None)
@@ -165,18 +159,17 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                     "value": value[i] if value else None,
                 }
                 cond_sql = self.sub_get_condition_deep_multiple(
-                    db=db, condition=current_cond, current_user=current_user
+                     condition=current_cond
                 )
                 cond_arr_sql.append(cond_sql)
             return or_(*cond_arr_sql)
         else:
             return self.sub_get_condition_deep_multiple(
-                db=db, condition=condition, current_user=current_user
+                condition=condition
             )
 
-    def sub_get_condition_deep_multiple(self, db, condition, current_user=None):
+    def sub_get_condition_deep_multiple(self, condition):
         keys = self.get_key_parts(condition["key"])
-        # print(keys)
         operators = condition["operator"].split(",")
         values = [condition.get("value", None)]
         match = condition.get("match", "and")
@@ -218,8 +211,6 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                     operator = operators[idx]
                     value = values[idx]
                     filter_condition = None
-
-                    attribute = None
                     if keys[i].startswith("@"):
                         method_name = keys[i]
                         args = value["args"]
@@ -247,20 +238,11 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                     elif operator == "date":
                         date_value = datetime.strptime(value, "%Y-%m-%d").date()
                         filter_condition = func.date(attribute) == date_value
-                    # elif operator == "last_24h":
-                    #     twenty_four_hours_ago = datetime.now() - timedelta(hours=24)
-                    #     filter_condition = (
-                    #         getattr(previous_model,
-                    #                 keys[i]) >= twenty_four_hours_ago
-                    #     )
                     elif operator == "last_24h":
                         now = datetime.now()
                         twenty_four_hours_ago = now - timedelta(hours=24)
 
                         filter_condition = attribute.between(twenty_four_hours_ago, now)
-                        print(
-                            "HERE IT IS: ", now, twenty_four_hours_ago, filter_condition
-                        )
 
                     elif operator == "between_date":
                         date_split = value.split(",")
@@ -344,14 +326,14 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         return attrs
 
     def get_first_where_array(
-            self, db: Session, *, where: Any = None, relations=None, current_user=None
+            self, db: Session, *, where: Any = None, relations=None
     ) -> List[ModelType]:
         query = db.query(self.model)
         if where is not None:
             conditions = []
             for condition in where:
                 filter_condition = self.get_condition_deep_multiple(
-                    db=db, condition=condition, current_user=current_user
+                   condition=condition
                 )
                 if filter_condition is not None:
                     conditions.append(filter_condition)
@@ -374,16 +356,13 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             order: str = "DESC",
             base_columns=None,
             relations=None,
-            current_user=None,
             include_deleted: bool = False,
             order_by_subquery=None,
             today_first: bool = False,
     ) -> List[ModelType]:
         query = db.query(self.model)
         conditions = self.get_full_condition(
-            db=db,
             where=where,
-            current_user=current_user,
             include_deleted=include_deleted,
         )
         if conditions is not None:
@@ -434,7 +413,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             query = query.options(load_only(*base_columns))
 
         if relations is not None and len(relations) > 0:
-            load_options = self.get_joined_load_v2(relations)
+            load_options = self.get_joined_load(relations)
             query = query.options(*load_options)
 
         result = query.all()
@@ -456,7 +435,6 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                     match = re.search(pattern, segment)
                     method_name = match.group(1)
                     argument = match.group(2)
-                    method = getattr(attribute.property.mapper.class_, method_name)
                     attribute = eval("method" + argument)
                 else:
                     attribute = getattr(attribute.property.mapper.class_, segment)
@@ -499,7 +477,6 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             db.commit()
         if refresh:
             db.refresh(db_obj)
-        # print(db_obj.__dict__)
         return db_obj
 
     def create_multi(
@@ -548,15 +525,8 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             obj_in: Union[UpdateSchemaType, Dict[str, Any]],
             user_id: int = None,
             commit: bool = True,
-            current_user: User = None,
     ) -> ModelType:
         obj_data = jsonable_encoder(db_obj)
-        if "created_at" in jsonable_encoder(obj_in):
-            if current_user:
-                if current_user.role.name not in settings.ROLES_ACCESS_CREATED_AT:
-                    obj_in.created_at = db_obj.created_at
-            else:
-                obj_in.created_at = db_obj.created_at
         if isinstance(obj_in, dict):
             update_data = obj_in
         else:
@@ -681,15 +651,12 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             self,
             db: Session,
             where: Any = None,
-            current_user=None,
             include_deleted=False,
     ) -> int:
         query = db.query(self.model.id)
 
         conditions = self.get_full_condition(
-            db=db,
             where=where,
-            current_user=current_user,
             include_deleted=include_deleted,
         )
         if conditions is not None:
@@ -700,7 +667,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         return result
 
     def get_full_condition(
-            self, db: Session, where: Any = None, current_user=None, include_deleted=False
+            self, where: Any = None, include_deleted=False
     ) -> Any:
         if not include_deleted:
             if not where:
@@ -713,28 +680,29 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             )
         if where is not None:
             conditions = []
-            is_or = False
             for parent_condition in where:
-                if type(parent_condition) is list:
-                    is_or = True
+                if isinstance(parent_condition, list):
+                    # This is an OR condition - any of the conditions in the list should be true
                     temp_conditions = []
                     for condition in parent_condition:
                         filter_condition = self.get_condition_deep_multiple(
-                            db=db, condition=condition, current_user=current_user
+                            condition=condition
                         )
                         if filter_condition is not None:
                             temp_conditions.append(filter_condition)
-                    conditions.append(and_(*temp_conditions))
+                    if temp_conditions:
+                        conditions.append(or_(*temp_conditions))
                 else:
+                    # This is a normal AND condition
                     filter_condition = self.get_condition_deep_multiple(
-                        db=db, condition=parent_condition, current_user=current_user
+                        condition=parent_condition
                     )
                     if filter_condition is not None:
                         conditions.append(filter_condition)
-            query_operator = or_ if is_or else and_
-            return query_operator(*conditions)
-        else:
-            return None
+
+            if conditions:
+                return and_(*conditions)
+        return None
 
     def remove_where_array(
             self, db: Session, where: Any = None, commit: bool = True

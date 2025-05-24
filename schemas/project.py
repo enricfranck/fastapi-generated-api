@@ -39,6 +39,8 @@ class ConfigSchema(BaseModel):
     server_name: str = ""
     server_host: str = ""
     docker_image_backend: str = "backend"
+    host_port: str = "8081"
+    container_port: str = "8081"
     backend_cors_origins: List[str] = []
     project_name: str = ""
     secret_key: str = ""
@@ -47,7 +49,7 @@ class ConfigSchema(BaseModel):
     last_name_superuser: str = ""
     first_superuser_password: str
     smtp_tls: bool = False
-    smtp_port: str = ""
+    smtp_port: int = 0
     smtp_host: str = ""
     smtp_user: str = ""
     smtp_password: str = ""
@@ -80,6 +82,8 @@ class ConfigSchema(BaseModel):
             server_name=get_or_default("server_name", default_server_name),
             server_host=get_or_default("server_host", default_server_host),
             docker_image_backend=get_or_default("docker_image_backend", "backend"),
+            container_port=get_or_default("container_port", "8081"),
+            host_port=get_or_default("host_port", "8081"),
             backend_cors_origins=get_or_default("backend_cors_origins", [
                 "http://localhost",
                 "http://localhost:4200",
@@ -107,14 +111,12 @@ class ConfigSchema(BaseModel):
 
 class ProjectBase(BaseModel):
     name: str
-    path: str
     config: ConfigSchema = None
     class_model: Any = None
 
 
 class ProjectCreate(BaseModel):
     name: str
-    path: str
     config: ConfigSchema = None
 
 
