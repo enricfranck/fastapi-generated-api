@@ -88,7 +88,6 @@ def generate_full_models(model):
     ]
     return "\n".join(schema_lines)
 
-
 def write_models(models: List[ClassModel], output_dir):
     """Write the generated models to files."""
     output_dir += OUTPUT_DIR
@@ -107,5 +106,6 @@ def write_models(models: List[ClassModel], output_dir):
         with open(file_path, "w") as f:
             f.write(final_content)
         print(f"Generated model for: {model_name}")
+
 
 

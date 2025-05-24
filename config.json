@@ -1,8 +1,8 @@
 {
-    "new_project_path": "project/enseignement",
-    "db": "enseignement_db",
-    "user": "enseignement_user",
-    "host": "host.docker.internal",
-    "password": "enseignement_password",
-    "port": 3306
+  "new_project_path": "project/enseignement",
+  "db": "enseignement_db",
+  "user": "enseignement_user",
+  "host": "host.docker.internal",
+  "password": "enseignement_password",
+  "port": 3306
 }
