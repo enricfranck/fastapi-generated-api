@@ -73,7 +73,7 @@ def generate_data(type_: Any, length: int = 0):
 
 def get_column_type(column_type: str) -> str:
     """Map SQLAlchemy column type strings to Pydantic types."""
-    column_type = column_type.lower()  # Normalize the type string
+    column_type = get_comumn_type_msql(column_type).lower()  # Normalize the type string
 
     if column_type == "integer":
         return "int"
@@ -91,6 +91,31 @@ def get_column_type(column_type: str) -> str:
         return "UUID"
     elif column_type == "json":
         return "dict"
+    else:
+        return "Any"
+
+
+def get_comumn_type_msql(column_type: str) -> str:
+    """Map MYSQL column type strings to SQLAlchemy types."""
+    column_type = column_type.upper()  # Normalize the type string
+    if column_type == "INT":
+        return "Integer"
+    elif column_type == "VARCHAR(255)":
+        return "String(255)"
+    elif column_type == "TEXT":
+        return "Text"
+    elif column_type == "DECIMAL(10,2)":
+        return "Float"
+    elif column_type == "DATETIME":
+        return "Datetime"
+    elif column_type == "DATE":
+        return "Date"
+    elif column_type == "BOOLEAN":
+        return "Boolean"
+    elif column_type == "TIMESTAMP":
+        return "Time"
+    elif column_type == "JSON":
+        return "Json"
     else:
         return "Any"
 

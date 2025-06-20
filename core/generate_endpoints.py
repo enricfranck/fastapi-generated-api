@@ -1,37 +1,45 @@
 import os
 from typing import List
 
+import schemas
 from schemas import ClassModel
 from sqlalchemy.orm import DeclarativeMeta
 
-from model_type import  snake_to_camel, camel_to_snake
+from model_type import snake_to_camel, camel_to_snake
 
 OUTPUT_DIR = "/app/api/api_v1/endpoints"
 
 
-def generate_router_file(table_name):
+def generate_router_file(table_name, other_config):
     """Generate a FastAPI router file for CRUD operations."""
     schema_name = snake_to_camel(table_name)
     router_name = table_name
     crud_name = table_name
     response_model_name = f"Response{schema_name}"
 
-    router_lines = [
+    # Common imports
+    imports = [
         "from typing import Any",
         "from fastapi import APIRouter, Depends, HTTPException",
         "from fastapi.encoders import jsonable_encoder",
         "from sqlalchemy.orm import Session",
         "",
         "from app import crud, models, schemas",
-        "from app.api import deps",
         "",
         f"router = APIRouter()",
         "",
-        "",
+    ]
+
+    # Conditional imports and dependencies
+    auth_dependency = "current_user: models.User = Depends(deps.get_current_active_user)," if other_config.use_authentication else ""
+    auth_import = "from app.api import deps" if other_config.use_authentication else "# Authentication disabled in config"
+
+    # Route definitions
+    routes = [
         f"@router.get('/', response_model=schemas.{response_model_name})",
         f"def read_{router_name}s(",
         "        db: Session = Depends(deps.get_db),",
-        "        current_user: models.User = Depends(deps.get_current_active_user),",
+        f"        {auth_dependency}",
         ") -> Any:",
         f"    \"\"\"",
         f"    Retrieve {router_name}s.",
@@ -47,15 +55,12 @@ def generate_router_file(table_name):
         "        *,",
         "        db: Session = Depends(deps.get_db),",
         f"        {router_name}_in: schemas.{schema_name}Create,",
-        "        current_user: models.User = Depends(deps.get_current_active_user),",
+        f"        {auth_dependency}",
         ") -> Any:",
         f"    \"\"\"",
         f"    Create new {router_name}.",
         f"    \"\"\"",
-        "    if crud.user.is_superuser(current_user):",
-        f"        {router_name} = crud.{crud_name}.create(db=db, obj_in={router_name}_in)",
-        "    else:",
-        "        raise HTTPException(status_code=400, detail='Not enough permissions')",
+        f"   {router_name} = crud.{crud_name}.create(db=db, obj_in={router_name}_in)",
         f"    return {router_name}",
         "",
         "",
@@ -65,7 +70,7 @@ def generate_router_file(table_name):
         "        db: Session = Depends(deps.get_db),",
         f"        {router_name}_id: int,",
         f"        {router_name}_in: schemas.{schema_name}Update,",
-        "        current_user: models.User = Depends(deps.get_current_active_user),",
+        f"        {auth_dependency}",
         ") -> Any:",
         f"    \"\"\"",
         f"    Update an {router_name}.",
@@ -82,7 +87,7 @@ def generate_router_file(table_name):
         "        *,",
         "        db: Session = Depends(deps.get_db),",
         f"        {router_name}_id: int,",
-        "        current_user: models.User = Depends(deps.get_current_active_user),",
+        f"        {auth_dependency}",
         ") -> Any:",
         f"    \"\"\"",
         f"    Get {router_name} by ID.",
@@ -98,7 +103,7 @@ def generate_router_file(table_name):
         "        *,",
         "        db: Session = Depends(deps.get_db),",
         f"        {router_name}_id: int,",
-        "        current_user: models.User = Depends(deps.get_current_active_user),",
+        f"        {auth_dependency}",
         ") -> Any:",
         f"    \"\"\"",
         f"    Delete an {router_name}.",
@@ -111,17 +116,20 @@ def generate_router_file(table_name):
         "",
     ]
 
-    return "\n".join(router_lines)
+    # Combine imports and routes
+    router_lines = imports + [auth_import] + routes if auth_import else imports + routes
+
+    return "\n".join(line for line in router_lines if line.strip() != "")
 
 
-def write_endpoints(models: List[ClassModel], output_dir):
+def write_endpoints(models: List[ClassModel], output_dir, other_config: schemas.OtherConfigSchema):
     """Write the generated schemas to files."""
     endpoints_directory = output_dir + OUTPUT_DIR
     os.makedirs(endpoints_directory, exist_ok=True)
     for model in models:
         model = ClassModel(**model)
         table_name = camel_to_snake(model.name)
-        endpoints = generate_router_file(table_name)
+        endpoints = generate_router_file(table_name, other_config)
         file_name = f"{table_name}s.py"
         with open(os.path.join(endpoints_directory, file_name), "w") as f:
             f.write(endpoints)

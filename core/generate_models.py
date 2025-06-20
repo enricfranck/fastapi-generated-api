@@ -4,6 +4,7 @@ from typing import List
 
 from model_type import preserve_custom_sections, camel_to_snake, snake_to_camel, generate_class_name
 from schemas import ClassModel, AttributesModel
+from utils.generate_data_test import get_comumn_type_msql
 
 OUTPUT_DIR = "/app/models"
 
@@ -36,7 +37,7 @@ def generate_models(model: ClassModel):
     all_columns = model.attributes + default_columns
 
     for column in all_columns:
-        column_def = f"    {column.name} = Column({column.type}"
+        column_def = f"    {column.name} = Column({get_comumn_type_msql(column.type)}"
         if column.type == "String" and column.length:
             column_def += f"({column.length})"
 

@@ -1,1 +1,2 @@
-from .project import ProjectCreate, ProjectResponse, ClassModel, ConfigSchema, AttributesModel, ProjectUpdate, Body
+from .project import ProjectCreate, ProjectResponse, ClassModel, ConfigSchema, AttributesModel, \
+    ProjectUpdate, Body,OtherConfigSchema

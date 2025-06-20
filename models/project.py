@@ -9,4 +9,6 @@ class Project(Base):
     name = Column(String(100), nullable=False)
     path = Column(String(100), nullable=False)
     config = Column(JSON)
+    other_config = Column(JSON)
     class_model = Column(JSON)
+    nodes = Column(JSON)

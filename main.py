@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware  # Import CORSMiddleware
 from core.delete_models import delete_files
 from core.generate_apis_unit_test import write_test_apis
 from core.generate_base_file import write_base_files
+from core.generate_config import write_auth_config
 from core.generate_crud import write_crud
 from core.generate_crud_unit_test import write_test_crud
 from core.generate_endpoints import write_endpoints
@@ -17,6 +18,7 @@ from core.generate_env import generate_env
 from core.generate_init_file import write_init_files
 from core.generate_models import write_models
 from core.generate_schema import write_schemas
+from core.reformat_file import reformate_code
 from model_type import create_or_update_mysql_user, write_config, drop_mysql_database_user
 from schemas import ClassModel, ProjectUpdate
 from sqlalchemy.orm import Session
@@ -56,13 +58,16 @@ def create_all_file(project, destination_dir, migration_message):
     print("Generating project files...")
     write_models(project.class_model, destination_dir)
     write_schemas(project.class_model, destination_dir)
-    write_crud(project.class_model, destination_dir)
-    write_endpoints(project.class_model, destination_dir)
+    write_crud(project.class_model, destination_dir, project.other_config)
+    write_endpoints(project.class_model, destination_dir, project.other_config)
     write_init_files(destination_dir)
     write_base_files(project.class_model, destination_dir)
     write_test_crud(project.class_model, destination_dir)
     write_test_apis(project.class_model, destination_dir)
     generate_env(project.config, output_file=os.path.normpath(os.path.join(destination_dir, ".env")))
+    if not project.other_config.use_authentication:
+        reformate_code(destination_dir)
+    write_auth_config(destination_dir, project.other_config)
 
     # Optionally force file system sync
     try:
@@ -101,6 +106,7 @@ def generate_project(project, migration_message):
 
 @app.post("/project/config", response_model=schemas.ProjectResponse)
 def create_project(project: schemas.ProjectCreate, db: Session = Depends(get_db)):
+    project.nodes = None
     project = crud.create_project(db=db, project=project)
 
     create_or_update_mysql_user(

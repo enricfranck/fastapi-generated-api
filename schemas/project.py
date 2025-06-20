@@ -33,28 +33,25 @@ class ClassModel(BaseModel):
         return ", ".join(types)
 
 
+class OtherConfigSchema(BaseModel):
+    use_docker: bool = True
+    use_authentication: bool = True
+    use_socket: bool = False
+
+
 class ConfigSchema(BaseModel):
-    domain: str = "localhost"
-    stack_name: str = ""
-    server_name: str = ""
-    server_host: str = ""
     docker_image_backend: str = "backend"
     host_port: str = "8081"
     container_port: str = "8081"
+
     backend_cors_origins: List[str] = []
     project_name: str = ""
     secret_key: str = ""
-    first_superuser: EmailStr
+    first_superuser: Any = None
     first_name_superuser: str = ""
     last_name_superuser: str = ""
-    first_superuser_password: str
-    smtp_tls: bool = False
-    smtp_port: int = 0
-    smtp_host: str = ""
-    smtp_user: str = ""
-    smtp_password: str = ""
-    smtp_server: str = "smtp.gmail.com"
-    emails_from_email: str = ""
+    first_superuser_password: Any = None
+
     mysql_host: str = "localhost"
     mysql_port: Any = 3306
     mysql_user: str
@@ -70,17 +67,10 @@ class ConfigSchema(BaseModel):
             return config.get(key, default)
 
         # Dynamically generate default values based on body.name
-        default_stack_name = f"{body.name.lower()}-com"
-        default_server_name = f"http://{body.name.lower()}-com"
-        default_server_host = f"http://{body.name.lower()}-com"
         default_project_name = f"{body.name.title()}"
         default_secret_key = "tzrctxhgdc876guyguv6v"
 
         return cls(
-            domain=get_or_default("domain", "localhost"),
-            stack_name=get_or_default("stack_name", default_stack_name),
-            server_name=get_or_default("server_name", default_server_name),
-            server_host=get_or_default("server_host", default_server_host),
             docker_image_backend=get_or_default("docker_image_backend", "backend"),
             container_port=get_or_default("container_port", "8081"),
             host_port=get_or_default("host_port", "8081"),
@@ -90,17 +80,12 @@ class ConfigSchema(BaseModel):
             ]),
             project_name=get_or_default("project_name", default_project_name),
             secret_key=get_or_default("secret_key", default_secret_key),
+
             first_superuser=get_or_default("first_superuser", ""),
             first_name_superuser=get_or_default("first_name_superuser", "string"),
             last_name_superuser=get_or_default("last_name_superuser", "string"),
             first_superuser_password=get_or_default("first_superuser_password", ""),
-            smtp_tls=get_or_default("smtp_tls", True),
-            smtp_port=get_or_default("smtp_port", "string"),
-            smtp_host=get_or_default("smtp_host", "string"),
-            smtp_user=get_or_default("smtp_user", "string"),
-            smtp_password=get_or_default("smtp_password", "string"),
-            smtp_server=get_or_default("smtp_server", "smtp.gmail.com"),
-            emails_from_email=get_or_default("emails_from_email", "test@gmail.com"),
+
             mysql_host=get_or_default("mysql_host", "localhost"),
             mysql_port=get_or_default("mysql_port", 3306),
             mysql_user=get_or_default("mysql_user", ""),
@@ -112,12 +97,16 @@ class ConfigSchema(BaseModel):
 class ProjectBase(BaseModel):
     name: str
     config: ConfigSchema = None
+    other_config: OtherConfigSchema = None
     class_model: Any = None
+    nodes: Any = {}
 
 
 class ProjectCreate(BaseModel):
     name: str
     config: ConfigSchema = None
+    other_config: OtherConfigSchema = None
+    nodes: Any = {}
 
 
 class ProjectUpdate(BaseModel):

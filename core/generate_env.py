@@ -17,11 +17,6 @@ IMAGE_NAME='{replace_cote(config["docker_image_backend"])}'
 HOST_PORT='{replace_cote(config["host_port"])}'
 CONTAINER_PORT='{replace_cote(config["container_port"])}'
 
-# --- Server Settings ---
-SERVER_NAME='{replace_cote(config["server_name"])}'  # Or your domain name e.g., api.example.com
-SERVER_HOST='{replace_cote(config["server_host"])}'  # Listen on all available interfaces
-SCHEMAS='http'  # Use https in production with TLS
-
 # --- CORS Settings ---
 # Comma-separated list of frontend origins allowed to access the backend
 # Example for local development with React/Vue/Angular default ports
@@ -33,17 +28,6 @@ MYSQL_PORT={replace_cote(config["mysql_port"])}
 MYSQL_USER='{replace_cote(config["mysql_user"])}'
 MYSQL_PASSWORD='{replace_cote(config["mysql_password"])}'
 MYSQL_DATABASE='{replace_cote(config["mysql_database"])}'
-
-# --- SMTP Settings (Skipped as requested) ---
-SMTP_TLS={config["smtp_tls"]}
-SMTP_PORT={replace_cote(config["smtp_port"])}  # Use a common default port number (e.g., 587, 465, 25)
-SMTP_HOST={replace_cote(config["smtp_host"])}  # Use a placeholder hostname
-SMTP_USER={replace_cote(config["smtp_user"])}  # Use a placeholder email/username
-SMTP_PASSWORD={replace_cote(config["smtp_password"])}  # Use a placeholder password
-EMAILS_FROM_EMAIL={replace_cote(config["emails_from_email"])}  # Use a valid placeholder email format
-EMAILS_FROM_NAME='MyFastAPIProject'  # Use your project name or placeholder
-SMTP_SERVER={replace_cote(config["smtp_server"])}  # Often same as SMTP_HOST
-PASSWORD_FROM_EMAIL='password-reset@example.com'  # Use a valid placeholder email
 
 # --- Superuser Credentials ---
 FIRST_SUPERUSER='{replace_cote(config["first_superuser"])}'
