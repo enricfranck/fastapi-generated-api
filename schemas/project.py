@@ -17,6 +17,30 @@ class AttributesModel(BaseModel):
     foreign_key_class: Optional[str] = None
     foreign_key: Optional[str] = None
 
+    @property
+    def sqlalchemy_type(self) -> str:
+        """Convert string-based DB type into a SQLAlchemy type."""
+        t = self.type.upper()
+
+        if "VARCHAR" in t:
+            return f"String"
+        elif t == "TEXT":
+            return "Text"
+        elif t == "INT" or t == "INTEGER":
+            return "Integer"
+        elif t == "BOOLEAN":
+            return "Boolean"
+        elif t == "DATETIME":
+            return "DateTime"
+        elif t == "TIMESTAMP":
+            return "Time"
+        elif t.startswith("DECIMAL") or t.startswith("NUMERIC"):
+            return "Float"
+        elif t == "Json":
+            return "JSON"
+        # Add other mappings as needed
+        return t  # fallback
+
 
 class ClassModel(BaseModel):
     """Represents a database table model using Pydantic."""
@@ -29,7 +53,7 @@ class ClassModel(BaseModel):
         """Get unique SQLAlchemy column types used in the model."""
         types = set()
         for attr in self.attributes:
-            types.add(attr.type)
+            types.add(attr.sqlalchemy_type)
         return ", ".join(types)
 
 
@@ -98,22 +122,22 @@ class ProjectBase(BaseModel):
     name: str
     config: ConfigSchema = None
     other_config: OtherConfigSchema = None
-    class_model: Any = None
-    nodes: Any = {}
 
 
 class ProjectCreate(BaseModel):
     name: str
     config: ConfigSchema = None
     other_config: OtherConfigSchema = None
-    nodes: Any = {}
 
 
 class ProjectUpdate(BaseModel):
     class_model: List[ClassModel] = None
+    nodes: Any = {}
 
 
 class ProjectResponse(ProjectBase):
+    class_model: Any = None
+    nodes: Any = {}
     id: int
 
     class Config:

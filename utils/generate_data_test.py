@@ -107,7 +107,7 @@ def get_comumn_type_msql(column_type: str) -> str:
     elif column_type == "DECIMAL(10,2)":
         return "Float"
     elif column_type == "DATETIME":
-        return "Datetime"
+        return "DateTime"
     elif column_type == "DATE":
         return "Date"
     elif column_type == "BOOLEAN":
@@ -115,7 +115,7 @@ def get_comumn_type_msql(column_type: str) -> str:
     elif column_type == "TIMESTAMP":
         return "Time"
     elif column_type == "JSON":
-        return "Json"
+        return "JSON"
     else:
         return "Any"
 

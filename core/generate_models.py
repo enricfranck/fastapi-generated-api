@@ -73,7 +73,7 @@ def generate_models(model: ClassModel):
     models_lines.append("    # Relations")
     for column in model.attributes:
         if column.is_foreign:
-            column_def = f"    {camel_to_snake(column.foreign_key_class)} = relationship('{column.foreign_key_class}', " \
+            column_def = f"    {camel_to_snake(column.foreign_key_class)} = relationship('{column.foreign_key_class}.{column.foreign_key}', " \
                          f"foreign_keys=[{column.name}])"
             models_lines.append(column_def)
 
@@ -88,6 +88,7 @@ def generate_full_models(model):
         generate_models(model),
     ]
     return "\n".join(schema_lines)
+
 
 def write_models(models: List[ClassModel], output_dir):
     """Write the generated models to files."""
@@ -107,6 +108,3 @@ def write_models(models: List[ClassModel], output_dir):
         with open(file_path, "w") as f:
             f.write(final_content)
         print(f"Generated model for: {model_name}")
-
-
-

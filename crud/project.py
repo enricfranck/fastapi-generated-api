@@ -27,8 +27,10 @@ def delete_project(db: Session, project_id: int):
 
 def update_project(db: Session, project_id: int, project_data: schemas.ProjectUpdate):
     db_project = db.query(models.Project).filter(models.Project.id == project_id).first()
+    nodes = jsonable_encoder(project_data.nodes)
     if db_project:
         db_project.class_model = jsonable_encoder(project_data.class_model)
+        db_project.nodes = nodes
         db.commit()
         db.refresh(db_project)
     return db_project
@@ -44,12 +46,10 @@ def update_config(db: Session, project_id: int, project_data: schemas.ProjectCre
     )
 
     other_config = jsonable_encoder(project_data.other_config)
-    nodes = jsonable_encoder(project_data.nodes)
     if db_project:
         db_project.name = jsonable_encoder(project_data.name)
         db_project.config = jsonable_encoder(config)
         db_project.other_config = other_config
-        db_project.nodes = nodes
         db.commit()
         db.refresh(db_project)
     return db_project

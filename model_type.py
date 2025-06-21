@@ -44,15 +44,25 @@ def snake_to_camel(snake_str):
     return ''.join(word.capitalize() for word in snake_str.split('_'))
 
 
+import re
+
+
 def generate_class_name(class_name: str) -> str:
-    """Convert a string to CamelCase."""
+    """Convert a string to PascalCase, preserving already properly formatted names."""
+    # Check if the name is already in PascalCase (starts with capital, no separators)
+    if (class_name[0].isupper() and
+            not any(c in class_name for c in ['_', '-', ' ']) and
+            not class_name.isupper()):
+        return class_name
+
+    # Standard PascalCase conversion for other cases
     # Replace any non-alphanumeric characters with spaces
     class_name = re.sub(r'[^a-zA-Z0-9]', ' ', class_name)
     # Split into words based on spaces
     words = class_name.split()
     # Capitalize the first letter of each word and join them
-    camel_case = ''.join(word.capitalize() for word in words)
-    return camel_case
+    pascal_case = ''.join(word.capitalize() for word in words)
+    return pascal_case
 
 
 def camel_to_snake(name):

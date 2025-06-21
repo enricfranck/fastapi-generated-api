@@ -4,6 +4,7 @@ from typing import List
 
 import uvicorn as uvicorn
 from fastapi import FastAPI
+from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware  # Import CORSMiddleware
 
@@ -51,23 +52,25 @@ def set_full_permissions(directory: str):
         print(f"Failed to set permissions for directory {directory}: {e}")
 
 
-def create_all_file(project, destination_dir, migration_message):
+def create_all_file(project, destination_dir, migration_message, class_model: List[ClassModel]):
     print("Setting permissions...")
     set_full_permissions(destination_dir)
 
     print("Generating project files...")
-    write_models(project.class_model, destination_dir)
-    write_schemas(project.class_model, destination_dir)
-    write_crud(project.class_model, destination_dir, project.other_config)
-    write_endpoints(project.class_model, destination_dir, project.other_config)
+
+    other_config = schemas.OtherConfigSchema(**project.other_config)
+    write_models(class_model, destination_dir)
+    write_schemas(class_model, destination_dir)
+    write_crud(class_model, destination_dir, other_config)
+    write_endpoints(class_model, destination_dir, other_config)
     write_init_files(destination_dir)
-    write_base_files(project.class_model, destination_dir)
-    write_test_crud(project.class_model, destination_dir)
-    write_test_apis(project.class_model, destination_dir)
+    write_base_files(class_model, destination_dir)
+    write_test_crud(class_model, destination_dir)
+    write_test_apis(class_model, destination_dir, other_config)
     generate_env(project.config, output_file=os.path.normpath(os.path.join(destination_dir, ".env")))
-    if not project.other_config.use_authentication:
+    if not other_config.use_authentication:
         reformate_code(destination_dir)
-    write_auth_config(destination_dir, project.other_config)
+    write_auth_config(destination_dir, other_config)
 
     # Optionally force file system sync
     try:
@@ -79,7 +82,7 @@ def create_all_file(project, destination_dir, migration_message):
     run_migrations(message=migration_message)
 
 
-def generate_project(project, migration_message):
+def generate_project(project, migration_message, class_model: List[ClassModel]):
     # Get current file's directory (inside 'test')
     current_dir = Path(__file__).resolve().parent
     root_dir = current_dir.parent
@@ -90,13 +93,13 @@ def generate_project(project, migration_message):
     try:
         print("mandalo tsara", template_dir, destination_dir)
         if os.path.exists(destination_dir):
-            create_all_file(project, destination_dir, migration_message)
+            create_all_file(project, destination_dir, migration_message, class_model)
         else:
             # Copy the template directory to the destination
             shutil.copytree(template_dir, destination_dir)
 
             # Generate files in the new directory
-            create_all_file(project, destination_dir, migration_message)
+            create_all_file(project, destination_dir, migration_message, project.class_model)
 
     except FileExistsError as e:
         print("Error: Directory already exists.", e)
@@ -124,6 +127,7 @@ def update_project(
         project_in: schemas.ProjectCreate,
         db: Session = Depends(get_db),
 ):
+    print(project_in)
     project = crud.update_config(db=db, project_data=project_in, project_id=project_id)
 
     destination_dir = os.path.join("project", project.name)
@@ -136,6 +140,16 @@ def update_project(
     write_config(project)
     if os.path.exists(destination_dir + "/.env"):
         generate_env(project.config, output_file=destination_dir + "/.env")
+    return project
+
+
+@app.put("/project/diagram", response_model=schemas.ProjectResponse)
+def update_project(
+        project_id: int,
+        project_in: schemas.ProjectUpdate,
+        db: Session = Depends(get_db),
+):
+    project = crud.update_project(db=db, project_data=project_in, project_id=project_id)
     return project
 
 
@@ -172,33 +186,34 @@ async def update_project(
         project_id: int,
         project_in: ProjectUpdate,
         db: Session = Depends(get_db),
-        write_project: bool = False,
         migration_message: str = "",
         updated_class: List[str] = None
 ):
-    default_project = crud.get_project_by_id(db=db, id=project_id)
-    if not default_project:
+    project = crud.get_project_by_id(db=db, id=project_id)
+    if not project:
         raise HTTPException(status_code=404, detail='Project not found')
 
-    updated_class = [updated_.lower() for updated_ in updated_class]
-    project = crud.update_project(db=db, project_data=project_in, project_id=project_id)
+    updated_class = [updated_.lower() for updated_ in updated_class] if updated_class else []
+    # project = crud.update_project(db=db, project_data=project_in, project_id=project_id)
 
+    print("updated class", updated_class)
     old_class = [old['name'] for old in project.class_model]
     new_class_model = [new_.name for new_ in project_in.class_model]
 
     new_class = [class_.name for class_ in project_in.class_model if class_.name not in old_class]
     deleted_class = [class_ for class_ in old_class if class_ not in new_class_model]
 
-    project_in.class_model = [project_ for project_ in project.class_model if project_['name'].lower() in updated_class
-                              and project_['name'].lower() not in new_class]
-    if write_project:
-        generate_project(project, migration_message)
-        if len(deleted_class) > 0:
-            destination_dir = os.path.join("project", project.name)
-            for class_name in deleted_class:
-                delete_files(class_name, destination_dir)
-            write_init_files(destination_dir)
-            write_base_files(project.class_model, destination_dir)
+    class_model = [project_ for project_ in project.class_model if project_['name'].lower() in updated_class
+                   and project_['name'].lower() not in new_class]
+
+    print(jsonable_encoder(class_model))
+    generate_project(project, migration_message, class_model)
+    if len(deleted_class) > 0:
+        destination_dir = os.path.join("project", project.name)
+        for class_name in deleted_class:
+            delete_files(class_name, destination_dir)
+        write_init_files(destination_dir)
+        write_base_files(project.class_model, destination_dir)
     return project
 
 

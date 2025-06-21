@@ -60,7 +60,7 @@ def generate_router_file(table_name, other_config):
         f"    \"\"\"",
         f"    Create new {router_name}.",
         f"    \"\"\"",
-        f"   {router_name} = crud.{crud_name}.create(db=db, obj_in={router_name}_in)",
+        f"    {router_name} = crud.{crud_name}.create(db=db, obj_in={router_name}_in)",
         f"    return {router_name}",
         "",
         "",
