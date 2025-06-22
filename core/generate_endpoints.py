@@ -23,7 +23,7 @@ def generate_router_file(table_name, other_config):
         "from fastapi import APIRouter, Depends, HTTPException",
         "from fastapi.encoders import jsonable_encoder",
         "from sqlalchemy.orm import Session",
-        "",
+        "from app.api import deps",
         "from app import crud, models, schemas",
         "",
         f"router = APIRouter()",
@@ -33,6 +33,9 @@ def generate_router_file(table_name, other_config):
     # Conditional imports and dependencies
     auth_dependency = "current_user: models.User = Depends(deps.get_current_active_user)," if other_config.use_authentication else ""
     auth_import = "from app.api import deps" if other_config.use_authentication else "# Authentication disabled in config"
+
+    data = f"{router_name}_id"
+    value = f"{{{data}}}"
 
     # Route definitions
     routes = [
@@ -48,8 +51,8 @@ def generate_router_file(table_name, other_config):
         f"    count = crud.{crud_name}.get_count_where_array(db=db)",
         f"    response = schemas.{response_model_name}(**{{'count': count, 'data': jsonable_encoder({router_name}s)}})",
         "    return response",
-        "",
-        "",
+        "\n",
+        "\n",
         f"@router.post('/', response_model=schemas.{schema_name})",
         f"def create_{router_name}(",
         "        *,",
@@ -62,9 +65,9 @@ def generate_router_file(table_name, other_config):
         f"    \"\"\"",
         f"    {router_name} = crud.{crud_name}.create(db=db, obj_in={router_name}_in)",
         f"    return {router_name}",
-        "",
-        "",
-        f"@router.put('/', response_model=schemas.{schema_name})",
+        "\n",
+        "\n",
+        f"@router.put('/{value}', response_model=schemas.{schema_name})",
         f"def update_{router_name}(",
         "        *,",
         "        db: Session = Depends(deps.get_db),",
@@ -80,9 +83,9 @@ def generate_router_file(table_name, other_config):
         f"        raise HTTPException(status_code=404, detail='{schema_name} not found')",
         f"    {router_name} = crud.{crud_name}.update(db=db, db_obj={router_name}, obj_in={router_name}_in)",
         f"    return {router_name}",
-        "",
-        "",
-        f"@router.get('/by_id/', response_model=schemas.{schema_name})",
+        "\n",
+        "\n",
+        f"@router.get('/{value}', response_model=schemas.{schema_name})",
         f"def read_{router_name}(",
         "        *,",
         "        db: Session = Depends(deps.get_db),",
@@ -96,9 +99,9 @@ def generate_router_file(table_name, other_config):
         f"    if not {router_name}:",
         f"        raise HTTPException(status_code=404, detail='{schema_name} not found')",
         f"    return {router_name}",
-        "",
-        "",
-        f"@router.delete('/', response_model=schemas.{schema_name})",
+        "\n",
+        "\n",
+        f"@router.delete('/{value}', response_model=schemas.{schema_name})",
         f"def delete_{router_name}(",
         "        *,",
         "        db: Session = Depends(deps.get_db),",
@@ -113,7 +116,7 @@ def generate_router_file(table_name, other_config):
         f"        raise HTTPException(status_code=404, detail='{schema_name} not found')",
         f"    {router_name} = crud.{crud_name}.remove(db=db, id={router_name}_id)",
         f"    return {router_name}",
-        "",
+        "\n",
     ]
 
     # Combine imports and routes

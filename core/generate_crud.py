@@ -66,7 +66,7 @@ def generate_crud_functions(table_name: str, model_name: str, other_config: sche
         "",
     ]
 
-    if other_config.use_authentication:
+    if other_config.use_authentication and model_name.upper() == "USER":
         user_functions = [
             f"    def get_by_email(self, db: Session, *, email: str) -> Optional[{model_name}]:",
             f"        return db.query({model_name}).filter({model_name}.email == email).first()",

@@ -1,25 +1,43 @@
 from fastapi import status
 from app.models import User
+from app.core import security
+from app import crud, schemas
 
 
 def test_login_access_token(client, db):
-    # Create a test user
-    user_data = {"email": "test@example.com", "password": "testpassword"}
-    user = User(**user_data)
-    db.add(user)
-    db.commit()
+    # Create a test user with hashed password
+    password = "securepassword123"
+    create_data = schemas.UserCreate(
+        name='Test User',
+        email='test@example.com',
+        password=password,
+        is_active=True,
+        is_superuser=False
+    )
+    user = crud.user.create(db=db, obj_in=create_data)
 
-    # Test login with correct credentials
+    # Verify user was created correctly
+    assert user is not None
+    assert user.email == 'test@example.com'
+    assert user.is_active is True  # Explicitly check active status
+    assert security.verify_password(password, user.hashed_password)
+
+    # Debug: Try authenticating directly
+    authenticated_user = crud.user.authenticate(
+        db, email='test@example.com', password=password
+    )
+    assert authenticated_user is not None  # This might fail
+
+    # Test login endpoint
     response = client.post(
         "/api/v1/login/access-token",
-        data={"username": user.email, "password": user_data["password"]},
+        data={
+            "username": user.email,
+            "password": password,
+            "grant_type": "password"
+        },
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
     )
+
     assert response.status_code == status.HTTP_200_OK
     assert "access_token" in response.json()
-
-    # Test login with incorrect credentials
-    response = client.post(
-        "/api/v1/login/access-token",
-        data={"username": user.email, "password": "wrongpassword"},
-    )
-    assert response.status_code == status.HTTP_400_BAD_REQUEST

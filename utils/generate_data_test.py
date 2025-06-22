@@ -1,8 +1,10 @@
 import datetime
 import uuid
-from typing import Any
+from typing import Any, Dict, List
 import random
 import string
+
+from schemas import AttributesModel
 
 
 def generate_random_text(length):
@@ -40,10 +42,33 @@ def generate_random_json():
     }
 
 
-def generate_data(type_: Any, length: int = 0):
+def generate_column(data: List[AttributesModel]) -> Dict[str, Any]:
+    """Generate realistic test data based on model attributes."""
+    result = {}
+    for attr in data:
+        if attr.name == "id":
+            continue
+        elif attr.name == "email":
+            result[attr.name] = "test@example.com"
+        elif attr.name == "hashed_password":
+            result['password'] = "securepassword123"
+        elif attr.type.lower() == "str":
+            result[attr.name] = f"test_{attr.name}"
+        elif attr.type.lower() == "int":
+            result[attr.name] = 123
+        elif attr.type.lower() == "bool":
+            result[attr.name] = True
+        elif attr.type.lower() == "float":
+            result[attr.name] = 1.23
+        else:
+            result[attr.name] = generate_data(attr.type, attr.length)
+    return result
+
+
+def generate_data(type_: Any, length: int = 5):
     type_ = type_.upper()
     limit = 10 if length and length >= 10 else length
-    if type_ == "STRING":
+    if type_ == "STRING(255)":
         return generate_random_text(generate_random_integer(limit))
     elif type_ == "INTEGER":
         return generate_random_integer(20)
@@ -68,7 +93,7 @@ def generate_data(type_: Any, length: int = 0):
     elif type_ == "UUID":
         return uuid.uuid4()
     else:
-        return ""
+        return generate_random_text(5)
 
 
 def get_column_type(column_type: str) -> str:
@@ -77,7 +102,7 @@ def get_column_type(column_type: str) -> str:
 
     if column_type == "integer":
         return "int"
-    elif column_type == "string" or column_type == "text":
+    elif column_type == "string(255)" or column_type == "text":
         return "str"
     elif column_type == "boolean":
         return "bool"

@@ -109,7 +109,6 @@ def generate_project(project, migration_message, class_model: List[ClassModel]):
 
 @app.post("/project/config", response_model=schemas.ProjectResponse)
 def create_project(project: schemas.ProjectCreate, db: Session = Depends(get_db)):
-    project.nodes = None
     project = crud.create_project(db=db, project=project)
 
     create_or_update_mysql_user(

@@ -7,13 +7,13 @@ from app.models import User
 
 def test_get_current_user(db, client):
     # Create a test user
-    user_data = {"email": "test@example.com", "password": "testpassword"}
+    user_data = {"email": "test@example.com", "hashed_password": security.get_password_hash("testpassword")}
     user = User(**user_data)
     db.add(user)
     db.commit()
 
     # Generate a token for the user
-    token = security.create_access_token(data={"id": str(user.id), "email": user.email})
+    token = security.create_access_token(sub={"id": str(user.id), "email": user.email})
 
     # Test get_current_user
     current_user = get_current_user(db=db, token=token)
@@ -22,13 +22,13 @@ def test_get_current_user(db, client):
 
 def test_get_current_active_user(db, client):
     # Create a test user
-    user_data = {"email": "test@example.com", "password": "testpassword", "is_active": True}
+    user_data = {"email": "test@example.com", "hashed_password": security.get_password_hash("testpassword"), "is_active": True}
     user = User(**user_data)
     db.add(user)
     db.commit()
 
     # Generate a token for the user
-    token = security.create_access_token(data={"id": str(user.id), "email": user.email})
+    token = security.create_access_token(sub={"id": str(user.id), "email": user.email})
 
     # Test get_current_active_user
     current_user = get_current_active_user(current_user=user)
@@ -37,7 +37,8 @@ def test_get_current_active_user(db, client):
 
 def test_get_current_active_superuser(db, client):
     # Create a test superuser
-    user_data = {"email": "admin@example.com", "password": "adminpassword", "is_superuser": True}
+    user_data = {"email": "admin@example.com", "hashed_password": security.get_password_hash("testpassword"),
+                 "is_superuser": True}
     user = User(**user_data)
     db.add(user)
     db.commit()

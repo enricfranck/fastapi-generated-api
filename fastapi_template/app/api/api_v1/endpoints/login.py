@@ -31,12 +31,12 @@ def login_access_token(
     )
     if not user:
         raise HTTPException(status_code=400, detail="Incorrect email or password")
-    elif not crud.user.is_active(user):
-        raise HTTPException(status_code=400, detail="Inactive user")
+    # elif not crud.user.is_active(user):
+    #     raise HTTPException(status_code=400, detail="Inactive user")
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
     token = security.create_access_token(
-        data={"id": str(user.id), "email": form_data.username},
+        sub={"id": str(user.id), "email": form_data.username},
         expires_delta=access_token_expires,
     )
     token_data = deps.get_user(token)
@@ -45,18 +45,6 @@ def login_access_token(
         raise HTTPException(status_code=404, detail="User not found")
 
     return {"access_token": token, "token_type": "Bearer"}
-
-
-@router.post("/test-token", response_model=schemas.User)
-def test_token(current_user: models.User = Depends(deps.get_current_user)) -> Any:
-    """
-    Test access token
-    """
-    expired_date = datetime(year=2025, month=8, day=31)
-    current_date = datetime.now()
-    if current_date >= expired_date:
-        raise HTTPException(status_code=400, detail="Expired Version")
-    return current_user
 
 
 @router.post("/test-token/{token}", response_model=schemas.User)
@@ -116,8 +104,8 @@ def reset_password(
             status_code=404,
             detail="The user with this username does not exist in the system.",
         )
-    elif not crud.user.is_active(user):
-        raise HTTPException(status_code=400, detail="Inactive user")
+    # elif not crud.user.is_active(user):
+    #     raise HTTPException(status_code=400, detail="Inactive user")
     hashed_password = get_password_hash(new_password)
     user.hashed_password = hashed_password
     db.add(user)

@@ -1,12 +1,24 @@
-#! /usr/bin/env bash
+#!/bin/bash
+set -e
 
-# Let the DB start
-python backend_pre_start.py
+echo "🧪 Running tests (mandatory pre-launch check)..."
+if /app/run_tests.sh; then
+    echo "✅ All tests passed - proceeding with startup"
+else
+    echo "❌ Tests failed - aborting startup"
+    exit 1
+fi
 
-# Run migrations
+# Normal startup procedure
+echo "⚙️ Initializing service..."
+python /app/backend_pre_start.py
+
+echo "📜 Running migrations..."
 alembic upgrade head
 
-# Create initial data in DB
-python initial_data.py
+# Step 4: Load initial data
+echo "🌱 Loading initial data..."
+python /app/initial_data.py
 
-uvicorn main:app --host 0.0.0.0 --port 8081 --reload
+echo "🚀 Starting application..."
+exec uvicorn main:app --host 0.0.0.0 --port 8081

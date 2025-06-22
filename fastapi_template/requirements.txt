@@ -29,3 +29,4 @@ regex
 pandas==2.0.3
 sqlalchemy-stubs==0.4
 pydantic[email]
+pytest-cov==4.1.0

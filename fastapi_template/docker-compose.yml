@@ -7,8 +7,10 @@ services:
       dockerfile: Dockerfile
     env_file:
       - .env
+    environment:
+      - TESTING=${TESTING:-0}  # Set to "true" to enable tests
     ports:
       - "${HOST_PORT}:${CONTAINER_PORT}"
     volumes:
       - ./files:/app/files
-    command: /bin/sh -c "prestart.sh"
+    command: /app/prestart.sh  # Just run the prestart script

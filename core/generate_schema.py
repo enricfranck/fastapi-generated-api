@@ -18,8 +18,9 @@ def generate_import(model: ClassModel) -> str:
     """Generate the necessary imports for the schema."""
     schema_lines = [
         "from datetime import datetime",
+        "from typing import Any",
         "from typing import List, Optional",
-        "from pydantic import BaseModel",
+        "from pydantic import BaseModel, ConfigDict",
     ]
 
     # Inspect relationships in the model
@@ -90,8 +91,7 @@ def generate_in_db_base_schema(model: ClassModel, base_schema: str, table_name: 
             schema_lines.append(f"    {column.name}: Optional[{column_type}]")
 
     schema_lines.append("")
-    schema_lines.append("    class Config:")
-    schema_lines.append("        orm_mode = True")
+    schema_lines.append("    model_config = ConfigDict(from_attributes=True)")
     schema_lines.append("")
 
     return "\n".join(schema_lines)
