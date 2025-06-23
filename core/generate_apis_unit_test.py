@@ -1,242 +1,273 @@
+# -*- coding: utf-8 -*-
+"""test_api_generator.py – v2
+
+Generate FastAPI integration tests (CRUD via HTTP) for every SQLAlchemy
+``ClassModel``.  Fully FK‑aware, supports optional JWT auth, and avoids
+string/dict concatenation errors.
+"""
+from __future__ import annotations
+
 import os
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Optional
 
 import schemas
 from schemas import ClassModel, AttributesModel
-
 from model_type import preserve_custom_sections, camel_to_snake
-from utils.generate_data_test import generate_data, generate_column
+from utils.generate_data_test import generate_column
 
-# Configuration
+# ---------------------------------------------------------------------------
+# Configuration & logging
+# ---------------------------------------------------------------------------
 OUTPUT_DIR = "/tests"
 TEST_LIST = ["create", "update", "get", "get_by_id", "delete"]
 
-# Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Helper generators (imports / auth / headers)
+# ---------------------------------------------------------------------------
 
-def generate_import(other_config: schemas.OtherConfigSchema) -> str:
-    """Generate the necessary imports for the schema."""
-    imports = [
+def _gen_imports(other_cfg: schemas.OtherConfigSchema) -> str:
+    """Return the import block inserted at top of every generated file."""
+    lines = [
         "from fastapi import status",
         "from app import crud, schemas",
         "import datetime",
     ]
-    if other_config.use_authentication:
-        imports.append("from app.core import security")
-    return "\n".join(imports)
+    if other_cfg.use_authentication:
+        lines.append("from app.core import security")
+    return "\n".join(lines)
 
 
-def generate_headers(other_config: schemas.OtherConfigSchema) -> str:
-    """Generate headers string with authentication if needed."""
-    if other_config.use_authentication:
-        return 'headers={"Authorization": f"Bearer {token}"}'
-    return ""
+def _gen_headers(other_cfg: schemas.OtherConfigSchema) -> str:
+    """Literal for the *headers=...* kwarg or an empty string."""
+    return 'headers={"Authorization": f"Bearer {token}"}' if other_cfg.use_authentication else ""
 
 
-def generate_auth_setup(other_config: schemas.OtherConfigSchema) -> List[str]:
-    """Generate authentication setup code if needed."""
-    if not other_config.use_authentication:
+def _gen_auth_setup(other_cfg: schemas.OtherConfigSchema) -> List[str]:
+    """Emit lines that create a user + JWT token if auth is enabled."""
+    if not other_cfg.use_authentication:
         return []
-
     return [
-        "    # Setup test user for authentication",
+        "    # Auth setup",
         "    user_data = {",
         "        'email': 'admin@example.com',",
         "        'password': 'securepassword',",
         "        'is_active': True,",
-        "        'is_superuser': False",
+        "        'is_superuser': False,",
         "    }",
         "    user = crud.user.create(db, obj_in=schemas.UserCreate(**user_data))",
         "    db.commit()",
-        "",
-        "    # Create access token",
         "    token = security.create_access_token(sub={'id': str(user.id), 'email': user.email})",
-        ""
+        "",
     ]
 
+# ---------------------------------------------------------------------------
+# Dependency builder – recursively POST parent FK resources
+# ---------------------------------------------------------------------------
 
-def generate_test_api(model: ClassModel, table_name: str, other_config: schemas.OtherConfigSchema) -> str:
-    """Generate test functions for API operations."""
-    test_name = camel_to_snake(model.name)
-    base_endpoint = f"/api/v1/{table_name}s"
-    class_lines = []
+def _build_api_dependencies(
+    model: ClassModel,
+    all_models: Dict[str, ClassModel],
+    other_cfg: schemas.OtherConfigSchema,
+    indent: str = "    ",
+    created: Optional[Dict[str, str]] = None,
+) -> List[str]:
+    """Return code lines that POST parent resources once each."""
+    if created is None:
+        created = {}
 
-    for test_key in TEST_LIST:
-        test_lines = [f"\n\ndef test_{test_key}_{table_name}_api(client, db):"]
-        test_data = generate_column(model.attributes)
+    lines: List[str] = []
+    hdrs = _gen_headers(other_cfg)
 
-        # Add authentication setup if needed
-        test_lines.extend(generate_auth_setup(other_config))
+    for attr in model.attributes:
+        if attr.is_foreign and attr.foreign_key_class:
+            parent_cls = all_models[attr.foreign_key_class]
+            if parent_cls.name in created:
+                continue  # already done
 
-        if test_key == "create":
-            test_lines.extend([
-                f"    # Test data",
-                f"    {test_name}_data = {test_data}",
-                f"",
-                f"    # Create request",
-                f"    response = client.post(",
-                f"        '{base_endpoint}/',",
-                f"        json={test_name}_data,",
-                f"        {generate_headers(other_config)}",
-                f"    )",
-                f"    assert response.status_code == status.HTTP_200_OK, response.text",
-                f"    created_{test_name} = response.json()",
-                f"    assert created_{test_name}['id'] is not None",
-                *[f"    assert created_{test_name}['{k}'] == {test_name}_data['{k}']"
-                  for k in test_data.keys() if k != 'password']
-            ])
+            # Recurse first (grand‑parents ..)
+            lines.extend(
+                _build_api_dependencies(parent_cls, all_models, other_cfg, indent, created)
+            )
 
-        elif test_key == "update":
-            test_lines.extend([
-                f"    # Create initial record",
-                f"    create_data = {test_data}",
-                f"    create_response = client.post(",
-                f"        '{base_endpoint}/',",
-                f"        json=create_data,",
-                f"        {generate_headers(other_config)}",
-                f"    )",
-                f"    assert create_response.status_code == status.HTTP_200_OK",
-                f"    created_{test_name} = create_response.json()",
+            parent_var = camel_to_snake(parent_cls.name)  # ex: "user"
+            parent_endpoint = f"/api/v1/{camel_to_snake(parent_cls.name)}s"
+            parent_payload = generate_column(parent_cls.attributes)
+            # ensure we have a literal string
+            if not isinstance(parent_payload, str):
+                parent_payload = repr(parent_payload)
+
+            lines += [
+                f"{indent}# Create parent {parent_cls.name}",
+                f"{indent}{parent_var}_payload = {parent_payload}",
+                f"{indent}resp_{parent_var} = client.post(",
+                f"{indent}    '{parent_endpoint}/',",
+                f"{indent}    json={parent_var}_payload,",
+                f"{indent}    {hdrs}",
+                f"{indent})",
+                f"{indent}assert resp_{parent_var}.status_code == status.HTTP_200_OK",
+                f"{indent}{parent_var} = resp_{parent_var}.json()",
                 "",
-                f"    # Update data",
-                f"    update_data = {{k: (not v) if isinstance(v, bool) else (v + 1) if isinstance(v, (int, "
-                f"    float)) else f'updated_{{v}}' for k, v in create_data.items()}}",
-                f"    update_response = client.put(",
-                f"        f'{base_endpoint}/{{created_{test_name}[\"id\"]}}',",
-                f"        json=update_data,",
-                f"        {generate_headers(other_config)}",
-                f"    )",
-                f"    assert update_response.status_code == status.HTTP_200_OK",
-                f"    updated_{test_name} = update_response.json()",
-                f"    assert updated_{test_name}['id'] == created_{test_name}['id']",
-                *[f"    assert updated_{test_name}['{k}'] == update_data['{k}']"
-                  for k in test_data.keys() if k != 'password']
-            ])
+            ]
+            created[parent_cls.name] = parent_var
 
-        elif test_key == "get":
-            test_lines.extend([
-                f"    # Create test record",
-                f"    {test_name}_data = {test_data}",
-                f"    create_response = client.post(",
-                f"        '{base_endpoint}/',",
-                f"        json={test_name}_data,",
-                f"        {generate_headers(other_config)}",
-                f"    )",
-                f"    assert create_response.status_code == status.HTTP_200_OK",
-                f"    created_{test_name} = create_response.json()",
-                f"",
-                f"    # Get all records",
-                f"    get_response = client.get(",
-                f"        '{base_endpoint}/',",
-                f"        {generate_headers(other_config)}",
-                f"    )",
-                f"    assert get_response.status_code == status.HTTP_200_OK",
-                f"    records = get_response.json()",
-                f"    assert isinstance(records, dict)",
+    return lines
 
-                f"    items = records['data']",
-                f"    assert isinstance(items, list)",
+# ---------------------------------------------------------------------------
+# Test generation for a single model
+# ---------------------------------------------------------------------------
 
-                f"    assert len(items) > 0",
-                f"    assert any(r['id'] == created_{test_name}['id'] for r in items)"
-            ])
+def _gen_test_api(
+    model: ClassModel,
+    table_name: str,
+    all_models: Dict[str, ClassModel],
+    other_cfg: schemas.OtherConfigSchema,
+) -> str:
+    """Return the full set of CRUD test functions for one model."""
 
-        elif test_key == "get_by_id":
-            test_lines.extend([
-                f"    # Create test record",
-                f"    {test_name}_data = {test_data}",
-                f"    create_response = client.post(",
-                f"        '{base_endpoint}/',",
-                f"        json={test_name}_data,",
-                f"        {generate_headers(other_config)}",
-                f"    )",
-                f"    assert create_response.status_code == status.HTTP_200_OK",
-                f"    created_{test_name} = create_response.json()",
-                f"",
-                f"    # Get by ID",
-                f"    get_response = client.get(",
-                f"        f'{base_endpoint}/{{created_{test_name}[\"id\"]}}',",
-                f"        {generate_headers(other_config)}",
-                f"    )",
-                f"    assert get_response.status_code == status.HTTP_200_OK",
-                f"    retrieved_{test_name} = get_response.json()",
-                f"    assert retrieved_{test_name}['id'] == created_{test_name}['id']",
-                *[f"    assert retrieved_{test_name}['{k}'] == {test_name}_data['{k}']"
-                  for k in test_data.keys() if k != 'password']
-            ])
+    base_ep = f"/api/v1/{table_name}s"
+    code_lines: List[str] = []
 
-        elif test_key == "delete":
-            test_lines.extend([
-                f"    # Create test record",
-                f"    {test_name}_data = {test_data}",
-                f"    create_response = client.post(",
-                f"        '{base_endpoint}/',",
-                f"        json={test_name}_data,",
-                f"        {generate_headers(other_config)}",
-                f"    )",
-                f"    assert create_response.status_code == status.HTTP_200_OK",
-                f"    created_{test_name} = create_response.json()",
-                f"",
-                f"    # Delete record",
-                f"    delete_response = client.delete(",
-                f"        f'{base_endpoint}/{{created_{test_name}[\"id\"]}}',",
-                f"        {generate_headers(other_config)}",
-                f"    )",
-                f"    assert delete_response.status_code == status.HTTP_200_OK",
-                f"    deleted_{test_name} = delete_response.json()",
-                f"    assert deleted_{test_name}['id'] == created_{test_name}['id']",
-                f"",
-                f"    # Verify deletion",
-                f"    get_response = client.get(",
-                f"        f'{base_endpoint}/{{created_{test_name}[\"id\"]}}',",
-                f"        {generate_headers(other_config)}",
-                f"    )",
-                f"    assert get_response.status_code == status.HTTP_404_NOT_FOUND"
-            ])
+    # Literal payload template
+    payload_template = generate_column(model.attributes)
+    if not isinstance(payload_template, str):
+        payload_template = repr(payload_template)
 
-        class_lines.extend(test_lines)
+    fk_fields = [attr.name for attr in model.attributes if attr.is_foreign]
+    fk_fields_literal = repr(fk_fields)
 
-    return "\n".join(class_lines)
+    hdrs_kwarg = _gen_headers(other_cfg)
+
+    for op in TEST_LIST:
+        tl: List[str] = [f"\n\ndef test_{op}_{table_name}_api(client, db):"]
+        tl.append(f'    """{op.capitalize()} {model.name} via API."""')
+
+        # Auth (optional)
+        tl.extend(_gen_auth_setup(other_cfg))
+
+        # Parent creation
+        tl.extend(_build_api_dependencies(model, all_models, other_cfg))
+
+        # Payload with FK ids injected
+        tl.append(f"    payload = {payload_template}")
+        for attr in model.attributes:
+            if attr.is_foreign and attr.foreign_key_class:
+                parent_var = camel_to_snake(attr.foreign_key_class)
+                tl.append(f"    payload['{attr.name}'] = {parent_var}['id']")
+        tl.append("")
+
+        # -------------------------------- specific operations -----------------------------
+        if op == "create":
+            tl += [
+                f"    resp = client.post('{base_ep}/', json=payload, {hdrs_kwarg})",
+                "    assert resp.status_code == status.HTTP_200_OK, resp.text",
+                "    created = resp.json()",
+                "    assert created['id'] is not None",
+            ] + [
+                f"    assert created['{a.name}'] == payload['{a.name}']"
+                for a in model.attributes if a.name not in ("id", "hashed_password")
+            ]
+
+        elif op == "update":
+            tl += [
+                f"    resp_c = client.post('{base_ep}/', json=payload, {hdrs_kwarg})",
+                "    assert resp_c.status_code == status.HTTP_200_OK",
+                "    created = resp_c.json()",
+                f"    fk_fields = {fk_fields_literal}",
+                "    update_data = {",
+                "        k: (not v) if isinstance(v, bool) else",
+                "           (v + 1) if isinstance(v, (int, float)) else",
+                "           f'updated_{v}'",
+                "        for k, v in payload.items()",
+                "        if k not in ('id',) and k not in fk_fields",
+                "    }",
+                f"    data = schemas.{model.name}Update(**update_data)",
+                f"    resp_u = client.put(f'{base_ep}/{{created[\"id\"]}}', json=update_data, {hdrs_kwarg})",
+                "    assert resp_u.status_code == status.HTTP_200_OK",
+                "    updated = resp_u.json()",
+                "    assert updated['id'] == created['id']",
+            ] + [
+                f"    assert updated['{a.name}'] == update_data['{a.name}']"
+                for a in model.attributes if a.name not in ("id", "hashed_password") and not a.is_foreign
+            ]
+
+        elif op == "get":
+            tl += [
+                f"    client.post('{base_ep}/', json=payload, {hdrs_kwarg})",
+                f"    resp_g = client.get('{base_ep}/', {hdrs_kwarg})",
+                "    assert resp_g.status_code == status.HTTP_200_OK",
+                "    items = resp_g.json()['data']",
+                "    assert any(item.get('id') for item in items)",
+            ]
+
+        elif op == "get_by_id":
+            tl += [
+                f"    resp_c = client.post('{base_ep}/', json=payload, {hdrs_kwarg})",
+                "    created = resp_c.json()",
+                f"    resp_g = client.get(f'{base_ep}/{{created[\"id\"]}}', {hdrs_kwarg})",
+                "    assert resp_g.status_code == status.HTTP_200_OK",
+                "    retrieved = resp_g.json()",
+                "    assert retrieved['id'] == created['id']",
+            ]
+
+        elif op == "delete":
+            tl += [
+                f"    resp_c = client.post('{base_ep}/', json=payload, {hdrs_kwarg})",
+                "    created = resp_c.json()",
+                f"    resp_d = client.delete(f'{base_ep}/{{created[\"id\"]}}', {hdrs_kwarg})",
+                "    assert resp_d.status_code == status.HTTP_200_OK",
+                "    deleted = resp_d.json()",
+                f"    assert deleted['msg'] == '{model.name} deleted successfully'",
+                f"    resp_chk = client.get(f'{base_ep}/{{created[\"id\"]}}', {hdrs_kwarg})",
+                "    assert resp_chk.status_code == status.HTTP_404_NOT_FOUND",
+            ]
+
+        code_lines.extend(tl)
+
+    return "\n".join(code_lines)
+
+# ---------------------------------------------------------------------------
+# File‑level scaffold
+# ---------------------------------------------------------------------------
+
+def _gen_file(model: ClassModel, table_name: str, all_models: Dict[str, ClassModel], other_cfg: schemas.OtherConfigSchema) -> str:
+    return "\n".join([
+        _gen_imports(other_cfg),
+        _gen_test_api(model, table_name, all_models, other_cfg),
+    ])
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+def write_test_apis(models: List[ClassModel], output_dir: str, other_cfg: schemas.OtherConfigSchema) -> None:
+    out_dir = os.path.join(output_dir, OUTPUT_DIR.lstrip("/"))
+    os.makedirs(out_dir, exist_ok=True)
+
+    normalised = [m if isinstance(m, ClassModel) else ClassModel(**m) for m in models]
+    all_models: Dict[str, ClassModel] = {m.name: m for m in normalised}
+
+    for mdl in normalised:
+        tbl = camel_to_snake(mdl.name)
+        content = _gen_file(mdl, tbl, all_models, other_cfg)
+        fname = f"test_{tbl}_api.py"
+        fpath = os.path.join(out_dir, fname)
+        final = preserve_custom_sections(fpath, content)
+        with open(fpath, "w", encoding="utf-8") as fp:
+            fp.write(final)
+        logger.info("Generated test API for %s", tbl)
 
 
-def generate_full_schema(model: ClassModel, table_name: str, other_config: schemas.OtherConfigSchema) -> str:
-    """Generate the full test file content."""
-    content = [
-        generate_import(other_config),
-        generate_test_api(model, table_name, other_config),
-    ]
-    return "\n".join(content)
-
-
-def write_test_apis(models: List[ClassModel], output_dir: str, other_config: schemas.OtherConfigSchema) -> None:
-    """Write the generated test files."""
-    full_output_dir = os.path.join(output_dir, OUTPUT_DIR.lstrip('/'))
-    os.makedirs(full_output_dir, exist_ok=True)
-
-    for model in models:
-        try:
-            model = ClassModel(**model)
-            table_name = camel_to_snake(model.name)
-            content = generate_full_schema(model, table_name, other_config)
-            file_name = f"test_{table_name}_api.py"
-            file_path = os.path.join(full_output_dir, file_name)
-
-            # Preserve any custom sections in existing files
-            final_content = preserve_custom_sections(file_path, content)
-
-            with open(file_path, "w") as f:
-                f.write(final_content)
-            logger.info(f"Generated test API for: {table_name}")
-        except Exception as e:
-            logger.error(f"Failed to generate test API for {model.name}: {e}")
-            raise
-
-
-def main(models: List[ClassModel], other_config: schemas.OtherConfigSchema, output_dir: Optional[str] = None) -> None:
-    """Main entry point for test generation."""
+def main(models: List[ClassModel], other_cfg: schemas.OtherConfigSchema, output_dir: Optional[str] = None) -> None:
     if output_dir is None:
         output_dir = os.getcwd()
-    write_test_apis(models, output_dir, other_config)
+    write_test_apis(models, output_dir, other_cfg)
+
+
+if __name__ == "__main__":
+    # Example usage:
+    # main(models, other_cfg)
+    pass

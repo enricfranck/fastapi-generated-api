@@ -101,7 +101,7 @@ def generate_router_file(table_name, other_config):
         f"    return {router_name}",
         "\n",
         "\n",
-        f"@router.delete('/{value}', response_model=schemas.{schema_name})",
+        f"@router.delete('/{value}', response_model=schemas.Msg)",
         f"def delete_{router_name}(",
         "        *,",
         "        db: Session = Depends(deps.get_db),",
@@ -115,7 +115,7 @@ def generate_router_file(table_name, other_config):
         f"    if not {router_name}:",
         f"        raise HTTPException(status_code=404, detail='{schema_name} not found')",
         f"    {router_name} = crud.{crud_name}.remove(db=db, id={router_name}_id)",
-        f"    return {router_name}",
+        f"    return schemas.Msg(msg='{schema_name} deleted successfully')",
         "\n",
     ]
 

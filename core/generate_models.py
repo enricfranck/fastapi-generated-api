@@ -73,7 +73,7 @@ def generate_models(model: ClassModel):
     models_lines.append("    # Relations")
     for column in model.attributes:
         if column.is_foreign:
-            column_def = f"    {camel_to_snake(column.foreign_key_class)} = relationship('{column.foreign_key_class}.{column.foreign_key}', " \
+            column_def = f"    {camel_to_snake(column.foreign_key_class)} = relationship('{column.foreign_key_class}', " \
                          f"foreign_keys=[{column.name}])"
             models_lines.append(column_def)
 

@@ -41,7 +41,7 @@ def generate_base_schema(model: ClassModel, table_name: str) -> str:
             column_name = generate_comumn_name(column.name, not column.is_required)
             column_type = get_column_type(column.type)
 
-            default_value = " = None" if column_name['optional'] else ""
+            default_value = " = None"
             schema_lines.append(f"    {column_name['name']}: Optional[{column_type}]{default_value}")
     schema_lines.append("")
     return "\n".join(schema_lines)
