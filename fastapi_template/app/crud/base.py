@@ -466,12 +466,16 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             commit: bool = True,
             refresh: bool = True,
     ) -> ModelType:
-        obj_in_data = jsonable_encoder(obj_in)
+        # Convert to dict and ensure datetime objects are properly handled
+        obj_in_data = obj_in.model_dump()
+
+        # Create the database object
         db_obj = (
             self.model(**obj_in_data)
             if not user_id
             else self.model(**obj_in_data, last_user_to_interact=user_id)
-        )  # type: ignore
+        )
+
         db.add(db_obj)
         if commit:
             db.commit()

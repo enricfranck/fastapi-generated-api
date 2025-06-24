@@ -4,8 +4,9 @@ from typing import List, Dict, Any, Optional, Set, Tuple
 
 from schemas import ClassModel, AttributesModel
 from model_type import preserve_custom_sections, camel_to_snake
-from utils.generate_data_test import generate_data  #  ← NEW import
+from utils.generate_data_test import generate_data  # ← NEW import
 import datetime, uuid
+from datetime import datetime, date, time
 
 # ---------------------------------------------------------------------------
 # Configuration & logging
@@ -15,6 +16,7 @@ TEST_LIST = ["create", "update", "get", "get_by_id", "delete"]
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 # ---------------------------------------------------------------------------
 # Helpers for code generation
@@ -28,22 +30,27 @@ def _literal_value(attr: AttributesModel) -> str:
     """
     # Give special-case values you hard-coded earlier
     if attr.name == "email":
-        return "'test@example.com'"
+        name = generate_data("Email", 8)
+        domain = generate_data("Domain", 4)
+        return f"'{name}@{domain.lower()}.com'"
     if attr.name == "hashed_password":
-        return "'securepassword123'"
+        password = generate_data("PASS", 12)
+        return f"'{password}'"
 
     # Let your existing generator pick something appropriate
     value = generate_data(attr.type, attr.length or 5)
 
     # Turn the *runtime* value into source-code text
     if isinstance(value, str):
-        return repr(value)          # adds quotes & escapes
+        return repr(value)  # adds quotes & escapes
     if isinstance(value, (bool, int, float)):
         return repr(value)
-    if isinstance(value, (datetime.datetime, datetime.date, datetime.time)):
-        return f"datetime.{value.__class__.__name__}({value.isoformat()!r})"
+    if isinstance(value, (datetime, date, time)):
+        # Return datetime constructor instead of string
+        if isinstance(value, (datetime, date, time)):
+            return f"'{str(value.isoformat())}'"
     if isinstance(value, uuid.UUID):
-        return f"uuid.UUID('{value}')"
+        return f"'{str(value)}'"
 
     # fallback – rarely needed
     return repr(value)
@@ -55,12 +62,11 @@ def _literal_name(name: str) -> str:
     return name
 
 
-
 def _build_dependency_setup_lines(
-    model: ClassModel,
-    all_models: Dict[str, ClassModel],
-    created: Set[str],
-    indent: str = "    ",
+        model: ClassModel,
+        all_models: Dict[str, ClassModel],
+        created: Set[str],
+        indent: str = "    ",
 ) -> Tuple[List[str], str]:
     """
     Recursively create parent FK models and emit Python test code for the current model.
@@ -84,8 +90,8 @@ def _build_dependency_setup_lines(
     lines.append(f"{indent}# Test data for {model.name}")
     lines.append(f"{indent}{data_var} = schemas.{model.name}Create(")
     for attr in model.attributes:
-        if attr.name == "id" and attr.is_auto_increment:
-            continue  # ⛔️ Skip auto-incrementing primary key
+        if (attr.name == "id" and attr.is_auto_increment):
+            continue  # ⛔️ Skip auto-incrementing primary key, TYPE DATETIME
         if attr.is_foreign and attr.foreign_key_class:
             fk_var = camel_to_snake(attr.foreign_key_class)
             lines.append(f"{indent}    {attr.name}={fk_var}.id,")
@@ -115,17 +121,18 @@ def generate_import(_: ClassModel) -> str:
             "from sqlalchemy.orm import Session",
             "from typing import Any, Dict",
             "import pytest",
+            "from datetime import datetime, date, time, timedelta",
+            "import uuid",  # Add this if you're using UUID fields
         ]
     )
 
 
 def generate_test_crud(
-    model: ClassModel, table_name: str, all_models: Dict[str, ClassModel]
+        model: ClassModel, table_name: str, all_models: Dict[str, ClassModel]
 ) -> str:
     """Emit the five CRUD test functions, with FK-aware setup."""
     test_name = camel_to_snake(model.name)
     out: List[str] = [f'"""Tests for CRUD operations on {model.name} model."""']
-
     for test_key in TEST_LIST:
         lines: List[str] = [f"\n\ndef test_{test_key}_{table_name}(db: Session):"]
         lines.append(f'    """Test {test_key} operation for {model.name}."""')
@@ -135,7 +142,7 @@ def generate_test_crud(
         # -------------------------------------------------------------------
         dep_lines, root_var = _build_dependency_setup_lines(model, all_models, set())
         lines.extend(dep_lines)
-        data_var = f"{root_var}_data"          # created inside dependency builder
+        data_var = f"{root_var}_data"  # created inside dependency builder
         schema_update = f"schemas.{model.name}Update"
 
         # -------------------------------------------------------------------
@@ -149,30 +156,73 @@ def generate_test_crud(
                     *[
                         f"    assert {root_var}.{a.name} == {data_var}.{a.name}"
                         for a in model.attributes
-                        if a.is_required and a.name != "id"
+                        if a.name != "id" and a.name != 'hashed_password'
                     ],
                 ]
             )
 
         elif test_key == "update":
+            datetime_fields = [
+                a.name for a in model.attributes
+                if 'datetime' in a.type.lower()
+            ]
+            date_fields = [
+                a.name for a in model.attributes
+                if 'date' in a.type.lower() and 'datetime' not in a.type.lower()
+            ]
+            time_fields = [
+                a.name for a in model.attributes
+                if 'time' in a.type.lower() and 'datetime' not in a.type.lower()
+            ]
+
             lines.extend(
                 [
                     "    # Update data",
+                    *[
+                        f"    {a.name}_value = {root_var}.{a.name}"
+                        for a in model.attributes
+                        if (a.name != 'id' and not a.is_foreign and a.name != 'hashed_password')
+                    ],
                     f"    update_data = {schema_update}(**{{",
                     "        k: (not v) if isinstance(v, bool) else",
                     "           (v + 1) if isinstance(v, (int, float)) else",
+                    # Handle datetime fields - add 1 day
+                    "           (datetime.fromisoformat(v) + timedelta(days=1)).isoformat() if k in " + str(
+                        datetime_fields) + " and isinstance(v, str) else",
+                    "           (v + timedelta(days=1)) if k in " + str(
+                        datetime_fields) + " and isinstance(v, datetime) else",
+                    # Handle date fields - add 1 day
+                    "           (date.fromisoformat(v) + timedelta(days=1)).isoformat() if k in " + str(
+                        date_fields) + " and isinstance(v, str) else",
+                    "           (v + timedelta(days=1)) if k in " + str(date_fields) + " and isinstance(v, date) else",
+                    # Handle time fields - add 1 hour
+                    "           ((datetime.strptime(v, '%H:%M:%S') + timedelta(hours=1)).time().strftime('%H:%M:%S')) if k in " + str(
+                        time_fields) + " and isinstance(v, str) else",
+                    "           ((datetime.combine(date.today(), v) + timedelta(hours=1)).time()) if k in " + str(
+                        time_fields) + " and isinstance(v, time) else",
                     "           f'updated_{v}'",
-                    f"        for k, v in {data_var}.dict().items() if k != 'id'",
+                    f"        for k, v in {data_var}.dict().items()",
+                    "        if k not in ('id', 'hashed_password') and isinstance(v, dict) == False",
                     "    })",
                     f"    updated_{root_var} = crud.{table_name}.update("
-                    f"      db=db, db_obj={root_var}, obj_in=update_data)",
+                    f"db=db, db_obj={root_var}, obj_in=update_data)",
                     "",
                     "    # Assertions",
                     f"    assert updated_{root_var}.id == {root_var}.id",
                     *[
-                        f"    assert updated_{root_var}.{a.name} != {root_var}.{a.name}"
+                        # For datetime fields - check date changed
+                        f"    assert updated_{root_var}.{a.name}.date() != {a.name}_value.date()"
+                        if a.name in datetime_fields else
+                        # For date fields - check date changed
+                        f"    assert updated_{root_var}.{a.name} != {a.name}_value"
+                        if a.name in date_fields else
+                        # For time fields - check time changed
+                        f"    assert updated_{root_var}.{a.name}.strftime('%H:%M:%S') != {a.name}_value.strftime('%H:%M:%S')"
+                        if a.name in time_fields else
+                        # For all other fields
+                        f"    assert updated_{root_var}.{a.name} != {a.name}_value"
                         for a in model.attributes
-                        if a.is_required and a.name != 'id' and not a.is_foreign
+                        if a.name != 'id' and not a.is_foreign and a.name != 'hashed_password' and a.type.lower() != 'json'
                     ],
                 ]
             )
@@ -201,7 +251,7 @@ def generate_test_crud(
                     *[
                         f"    assert retrieved_{root_var}.{a.name} == {root_var}.{a.name}"
                         for a in model.attributes
-                        if a.is_required and a.name != 'id'
+                        if a.name != 'id' and a.name != 'hashed_password'
                     ],
                 ]
             )
@@ -227,7 +277,7 @@ def generate_test_crud(
 
 
 def generate_full_schema(
-    model: ClassModel, table_name: str, all_models: Dict[str, ClassModel]
+        model: ClassModel, table_name: str, all_models: Dict[str, ClassModel]
 ) -> str:
     """Concatenate imports + helper tests for one model into a file."""
     return "\n".join(
@@ -267,7 +317,6 @@ def write_test_crud(models: List[ClassModel], output_dir: str) -> None:
             fp.write(final_content)
 
         logger.info("Generated CRUD tests for %s", table_name)
-
 
 
 def main(models: List[ClassModel], output_dir: str | None = None) -> None:

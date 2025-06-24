@@ -9,7 +9,7 @@ def test_login_access_token(client, db):
     password = "securepassword123"
     create_data = schemas.UserCreate(
         name='Test User',
-        email='test@example.com',
+        email='testlogin@example.com',
         password=password,
         is_active=True,
         is_superuser=False
@@ -18,13 +18,13 @@ def test_login_access_token(client, db):
 
     # Verify user was created correctly
     assert user is not None
-    assert user.email == 'test@example.com'
+    assert user.email == 'testlogin@example.com'
     assert user.is_active is True  # Explicitly check active status
     assert security.verify_password(password, user.hashed_password)
 
     # Debug: Try authenticating directly
     authenticated_user = crud.user.authenticate(
-        db, email='test@example.com', password=password
+        db, email='testlogin@example.com', password=password
     )
     assert authenticated_user is not None  # This might fail
 

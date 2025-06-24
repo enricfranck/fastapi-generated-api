@@ -21,4 +21,4 @@ echo "🌱 Loading initial data..."
 python /app/initial_data.py
 
 echo "🚀 Starting application..."
-exec uvicorn main:app --host 0.0.0.0 --port 8081
+exec uvicorn main:app --host 0.0.0.0 --port 8081 --reload

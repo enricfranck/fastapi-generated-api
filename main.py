@@ -67,7 +67,6 @@ def create_all_file(project, destination_dir, migration_message, class_model: Li
     write_base_files(class_model, destination_dir)
     write_test_crud(class_model, destination_dir)
     write_test_apis(class_model, destination_dir, other_config)
-    generate_env(project.config, output_file=os.path.normpath(os.path.join(destination_dir, ".env")))
     if not other_config.use_authentication:
         reformate_code(destination_dir)
     write_auth_config(destination_dir, other_config)
@@ -97,8 +96,8 @@ def generate_project(project, migration_message, class_model: List[ClassModel]):
         else:
             # Copy the template directory to the destination
             shutil.copytree(template_dir, destination_dir)
-
             # Generate files in the new directory
+            generate_env(project.config, output_file=os.path.normpath(os.path.join(destination_dir, ".env")))
             create_all_file(project, destination_dir, migration_message, project.class_model)
 
     except FileExistsError as e:

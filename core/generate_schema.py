@@ -14,14 +14,94 @@ from utils.generate_data_test import get_column_type, generate_comumn_name
 OUTPUT_DIR = "/app/schemas"
 
 
+def generate_field_validators(model: ClassModel) -> str:
+    """Generate field validators for datetime, date, and time fields."""
+    datetime_fields = []
+    time_fields = []
+    date_fields = []
+
+    for column in model.attributes:
+        column_type = column.type.lower()
+        if 'datetime' in column_type:
+            datetime_fields.append(column.name)
+        elif 'time' in column_type and 'datetime' not in column_type:
+            time_fields.append(column.name)
+        elif 'date' in column_type and 'datetime' not in column_type:
+            date_fields.append(column.name)
+
+    validators = []
+
+    if datetime_fields:
+        fields_str = ', '.join([f"'{field}'" for field in datetime_fields])
+        validators.append(f"""
+    @field_validator({fields_str}, mode='before')
+    def parse_datetime(cls, value):
+        if value is None:
+            return None
+        if isinstance(value, str):
+            try:
+                return datetime.fromisoformat(value.replace('Z', '+00:00'))
+            except ValueError:
+                raise ValueError("Invalid datetime format")
+        return value
+""")
+
+    if time_fields:
+        fields_str = ', '.join([f"'{field}'" for field in time_fields])
+        validators.append(f"""
+    @field_validator({fields_str}, mode='before')
+    def parse_time(cls, value):
+        if value is None:
+            return None
+        if isinstance(value, str):
+            try:
+                # Handle both "HH:MM:SS" and "HH:MM" formats
+                parts = value.split(':')
+                if len(parts) == 2:
+                    return time.fromisoformat(value + ':00')
+                return time.fromisoformat(value)
+            except ValueError:
+                raise ValueError("Invalid time format, expected HH:MM:SS")
+        return value
+""")
+
+    if date_fields:
+        fields_str = ', '.join([f"'{field}'" for field in date_fields])
+        validators.append(f"""
+    @field_validator({fields_str}, mode='before')
+    def parse_date(cls, value):
+        if value is None:
+            return None
+        if isinstance(value, str):
+            try:
+                return date.fromisoformat(value)
+            except ValueError:
+                raise ValueError("Invalid date format, expected YYYY-MM-DD")
+        return value
+""")
+
+    return '\n'.join(validators) if validators else ""
+
+
 def generate_import(model: ClassModel) -> str:
     """Generate the necessary imports for the schema."""
     schema_lines = [
-        "from datetime import datetime",
+        "from datetime import datetime, time, date",
         "from typing import Any",
         "from typing import List, Optional",
-        "from pydantic import BaseModel, ConfigDict",
+        "from pydantic import BaseModel, ConfigDict, field_validator",
     ]
+
+    # Check if we need field validators
+    needs_validators = any(
+        'datetime' in col.type.lower() or
+        ('time' in col.type.lower() and 'datetime' not in col.type.lower()) or
+        ('date' in col.type.lower() and 'datetime' not in col.type.lower())
+        for col in model.attributes
+    )
+
+    if needs_validators:
+        schema_lines.append("from pydantic import field_validator")
 
     # Inspect relationships in the model
     for attr in model.attributes:
@@ -36,6 +116,7 @@ def generate_base_schema(model: ClassModel, table_name: str) -> str:
     """Generate the base schema class."""
     schema_name = f"{snake_to_camel(table_name)}Base"
     schema_lines = [f"\nclass {schema_name}(BaseModel):"]
+
     for column in model.attributes:
         if column.name != 'id':
             column_name = generate_comumn_name(column.name, not column.is_required)
@@ -43,6 +124,12 @@ def generate_base_schema(model: ClassModel, table_name: str) -> str:
 
             default_value = " = None"
             schema_lines.append(f"    {column_name['name']}: Optional[{column_type}]{default_value}")
+
+    # Add field validators if needed
+    validators = generate_field_validators(model)
+    if validators:
+        schema_lines.append(validators)
+
     schema_lines.append("")
     return "\n".join(schema_lines)
 

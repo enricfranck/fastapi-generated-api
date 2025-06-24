@@ -27,12 +27,11 @@ def generate_router_file(table_name, other_config):
         "from app import crud, models, schemas",
         "",
         f"router = APIRouter()",
-        "",
     ]
 
     # Conditional imports and dependencies
     auth_dependency = "current_user: models.User = Depends(deps.get_current_active_user)," if other_config.use_authentication else ""
-    auth_import = "from app.api import deps" if other_config.use_authentication else "# Authentication disabled in config"
+    auth_import = "from app.api import deps" if other_config.use_authentication else ""
 
     data = f"{router_name}_id"
     value = f"{{{data}}}"
@@ -51,8 +50,8 @@ def generate_router_file(table_name, other_config):
         f"    count = crud.{crud_name}.get_count_where_array(db=db)",
         f"    response = schemas.{response_model_name}(**{{'count': count, 'data': jsonable_encoder({router_name}s)}})",
         "    return response",
-        "\n",
-        "\n",
+        "",
+        "",
         f"@router.post('/', response_model=schemas.{schema_name})",
         f"def create_{router_name}(",
         "        *,",
@@ -65,8 +64,8 @@ def generate_router_file(table_name, other_config):
         f"    \"\"\"",
         f"    {router_name} = crud.{crud_name}.create(db=db, obj_in={router_name}_in)",
         f"    return {router_name}",
-        "\n",
-        "\n",
+        "",
+        "",
         f"@router.put('/{value}', response_model=schemas.{schema_name})",
         f"def update_{router_name}(",
         "        *,",
@@ -83,8 +82,8 @@ def generate_router_file(table_name, other_config):
         f"        raise HTTPException(status_code=404, detail='{schema_name} not found')",
         f"    {router_name} = crud.{crud_name}.update(db=db, db_obj={router_name}, obj_in={router_name}_in)",
         f"    return {router_name}",
-        "\n",
-        "\n",
+        "",
+        "",
         f"@router.get('/{value}', response_model=schemas.{schema_name})",
         f"def read_{router_name}(",
         "        *,",
@@ -99,8 +98,8 @@ def generate_router_file(table_name, other_config):
         f"    if not {router_name}:",
         f"        raise HTTPException(status_code=404, detail='{schema_name} not found')",
         f"    return {router_name}",
-        "\n",
-        "\n",
+        "",
+        "",
         f"@router.delete('/{value}', response_model=schemas.Msg)",
         f"def delete_{router_name}(",
         "        *,",
@@ -116,13 +115,14 @@ def generate_router_file(table_name, other_config):
         f"        raise HTTPException(status_code=404, detail='{schema_name} not found')",
         f"    {router_name} = crud.{crud_name}.remove(db=db, id={router_name}_id)",
         f"    return schemas.Msg(msg='{schema_name} deleted successfully')",
-        "\n",
+        "",
     ]
 
     # Combine imports and routes
-    router_lines = imports + [auth_import] + routes if auth_import else imports + routes
+    router_lines = imports + ([auth_import] if auth_import else []) + routes
 
-    return "\n".join(line for line in router_lines if line.strip() != "")
+    # Filter out empty strings and join with newlines
+    return "\n".join(line for line in router_lines if line.strip() != "" or line == "")
 
 
 def write_endpoints(models: List[ClassModel], output_dir, other_config: schemas.OtherConfigSchema):

@@ -1,4 +1,4 @@
-import datetime
+from datetime import date, datetime, time
 import uuid
 from typing import Any, Dict, List
 import random
@@ -49,7 +49,7 @@ def generate_column(data: List[AttributesModel]) -> Dict[str, Any]:
         if attr.name == "id":
             continue
         elif attr.name == "email":
-            result[attr.name] = "test@example.com"
+            result[attr.name] = f"{generate_data('Email', 5)}@{generate_data('Email', 5).lower()}.com"
         elif attr.name == "hashed_password":
             result['password'] = "securepassword123"
         elif attr.type.lower() == "str":
@@ -61,7 +61,16 @@ def generate_column(data: List[AttributesModel]) -> Dict[str, Any]:
         elif attr.type.lower() == "float":
             result[attr.name] = 1.23
         else:
-            result[attr.name] = generate_data(attr.type, attr.length)
+            value = generate_data(attr.type, attr.length)
+            if isinstance(value, str):
+                result[attr.name] =  repr(value)  # adds quotes & escapes
+            if isinstance(value, (bool, int, float)):
+                result[attr.name] = repr(value)
+            if isinstance(value, (datetime, date, time)):
+                result[attr.name] = str(value.isoformat())
+            if isinstance(value, uuid.UUID):
+                result[attr.name] = f"'{str(value)}'"
+
     return result
 
 
@@ -70,7 +79,7 @@ def generate_data(type_: Any, length: int = 5):
     limit = 10 if length and length >= 10 else length
     if type_ == "STRING(255)":
         return generate_random_text(generate_random_integer(limit))
-    elif type_ == "INTEGER":
+    elif type_ == "INTEGER" or type_ == "INT":
         return generate_random_integer(20)
     elif type_ == "TEXT":
         return generate_random_text(generate_random_integer(100))
@@ -79,11 +88,11 @@ def generate_data(type_: Any, length: int = 5):
     elif type_ == "FLOAT":
         return generate_random_float()
     elif type_ == "DATETIME":
-        return datetime.datetime.now()
+        return datetime.now()
     elif type_ == "DATE":
-        return datetime.date.today()
-    elif type_ == "TIME":
-        return datetime.time(
+        return date.today()
+    elif type_ == "TIME" or type_ == "TIMESTAMP":
+        return time(
             hour=generate_random_integer(23),
             minute=generate_random_integer(59),
             second=generate_random_integer(59)
@@ -110,6 +119,8 @@ def get_column_type(column_type: str) -> str:
         return "float"
     elif column_type == "datetime":
         return "datetime"
+    elif column_type == "timestamp":
+        return 'time'
     elif column_type == "date":
         return "date"
     elif column_type == "uuid":
